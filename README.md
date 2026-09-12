@@ -83,14 +83,16 @@ pnpm serve                # http://localhost:3000
 
 `pnpm serve` reloads the browser when a file under `site/` changes. Saving a
 file under `src/` re-runs `pnpm placeholder` first, so an edit to the page shows
-up right away — that rewrites `site/index.html` from the seed links and drops
-the preview's real content. Run `pnpm preview` again to get it back.
+up right away — that rewrites every page under `site/` from the seed links and
+drops the preview's real content. Run `pnpm preview` again to get it back.
 
 The pages under `site/` are tracked, so `git checkout -- site && git clean -fd site`
 undoes a preview.
 
-`pnpm placeholder` regenerates `site/index.html` from the seed links without
-touching Notion, for looking at the design before the databases exist.
+`pnpm placeholder` regenerates the pages under `site/` from the seed links
+without touching Notion, for looking at the design before the databases exist.
+It writes `/shifra`, `/graham`, and a copy of the root person's page at `/`, the
+same shape a real run produces.
 
 ## The Notion databases
 
@@ -100,9 +102,8 @@ There are two. Links:
 | ---------- | -------- | ------------------------------------------------------------------------------ |
 | `Title`    | title    | Card text. Not scraped — this is the copy you control.                         |
 | `URL`      | url      | Where the card points.                                                         |
-| `Order`    | number   | Sort order. Rows without one sort last.                                        |
 | `Visible`  | checkbox | Unchecked rows are dropped.                                                    |
-| `Kind`     | select   | `Link` renders a card, `Social` renders in the mono row.                       |
+| `Kind`     | select   | `Link` renders a card. `Social` renders in the icon row, and only the root person's social rows are used. |
 | `Everyone` | checkbox | Checked puts the link on every person's page.                                  |
 | `People`   | relation | Which pages the link appears on. Relate it to two rows and it appears on both. |
 
@@ -112,7 +113,7 @@ People:
 | --------- | ----- | ------------------------------------------- |
 | `Name`    | title | The heading on that person's page.          |
 | `Slug`    | text  | The URL path. `shifra` serves at `/shifra`. |
-| `Tagline` | text  | The line under the name.                    |
+| `Tagline` | text  | The page description in the metadata. Not shown on the page. |
 
 A link's audience is `Everyone` plus whatever `People` names. A row with both set
 is redundant, not contradictory, and a row with neither renders nowhere.
@@ -156,7 +157,7 @@ The webhook receiver reads its own set, plus `RENDER_API_KEY`:
 | `REBUILD_TASK`          | `grouplink.rebuild` | Task the webhook dispatches.                   |
 | `DEBOUNCE_MS`           | `60000`             | Quiet period before an edit starts a run.      |
 
-Each page's name and tagline come from its People row, not from configuration.
+Each page's name comes from its People row, not from configuration.
 
 Per-run overrides go in the input: `--input='[{"dryRun":false}]'`.
 
@@ -205,8 +206,8 @@ build step, inline CSS. It follows Render's brand foundations: semantic color
 tokens with a dark override, PP Neue Montreal for prose, square corners, 1px
 hairlines, and purple reserved for links and focus rings.
 
-The masthead is centered: the Render wordmark, the tagline, then a row of social
-icons. A social row whose label is `YouTube`, `LinkedIn`, `X`, `GitHub`, or
+The masthead is centered, with the Render wordmark above a row of social icons.
+It is the same on every page. A social row whose label is `YouTube`, `LinkedIn`, `X`, `GitHub`, or
 `Discord` gets
 the matching icon from `site/assets/icons/`; any other label renders as a mono
 wordmark. The wordmark and the icons are white files drawn as CSS masks and

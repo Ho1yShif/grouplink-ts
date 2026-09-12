@@ -6,7 +6,6 @@ export type LinkKind = "link" | "social";
 export interface LinkRow {
   title: string;
   url: string;
-  order: number;
   visible: boolean;
   kind: LinkKind;
   /** Renders on every person's page, whatever `personIds` holds. */
@@ -23,7 +22,7 @@ export interface PersonRow {
   tagline: string;
 }
 
-/** A person and the links that relate to them, in render order. */
+/** A person and the links that relate to them, in the order Notion returned them. */
 export interface PersonPage {
   person: PersonRow;
   rows: LinkRow[];
@@ -47,17 +46,63 @@ export function toLinkRows(pages: PageDTO[]): LinkRow[] {
     const title = readString(page.title) || readString(props["Title"]);
     if (!url || !title) continue;
 
-    const order = typeof props["Order"] === "number" ? props["Order"] : Number.MAX_SAFE_INTEGER;
     const visible = props["Visible"] !== false;
     const kind = readString(props["Kind"]).toLowerCase() === "social" ? "social" : "link";
     const everyone = props["Everyone"] === true;
     const related = props["People"];
     const personIds = Array.isArray(related) ? related : [];
 
-    rows.push({ title, url, order, visible, kind, everyone, personIds });
+    rows.push({ title, url, visible, kind, everyone, personIds });
   }
 
   return rows;
+}
+
+/** A link row read from Notion that renders on no page, and the check it failed. */
+export interface SkippedRow {
+  title: string;
+  url: string;
+  reason: string;
+}
+
+/**
+ * Why a row you can see in Notion is missing from the site. Re-reads the raw pages
+ * so it can name rows that toLinkRows drops before they become a LinkRow.
+ */
+export function skippedRows(pages: PageDTO[], people: PersonRow[]): SkippedRow[] {
+  const personIds = new Set(people.map((person) => person.id));
+  const skipped: SkippedRow[] = [];
+
+  for (const page of pages) {
+    const props = page.properties;
+    const url = readString(props["URL"]);
+    const title = readString(page.title) || readString(props["Title"]);
+    const label = title || url || page.id;
+
+    if (!url) {
+      skipped.push({ title: label, url, reason: "no URL" });
+      continue;
+    }
+    if (!title) {
+      skipped.push({ title: label, url, reason: "no Title" });
+      continue;
+    }
+    if (props["Visible"] === false) {
+      skipped.push({ title: label, url, reason: "Visible is unchecked" });
+      continue;
+    }
+    const related = props["People"];
+    const ids: string[] = Array.isArray(related) ? related : [];
+    if (props["Everyone"] !== true && !ids.some((id) => personIds.has(id))) {
+      const reason =
+        ids.length === 0
+          ? "no People relation and Everyone is unchecked"
+          : "its People relation points at no row in the People database";
+      skipped.push({ title: label, url, reason });
+    }
+  }
+
+  return skipped;
 }
 
 /**
@@ -101,8 +146,9 @@ export function pagePath(siteDir: string, slug: string): string {
   return slug ? `${siteDir}/${slug}/index.html` : `${siteDir}/index.html`;
 }
 
-export function visibleInOrder(rows: LinkRow[]): LinkRow[] {
-  return rows.filter((row) => row.visible).sort((a, b) => a.order - b.order);
+/** Cards render in the order the Notion database returned them. */
+export function visibleRows(rows: LinkRow[]): LinkRow[] {
+  return rows.filter((row) => row.visible);
 }
 
 /** Best-effort icon. The card hides the image when this 404s. */

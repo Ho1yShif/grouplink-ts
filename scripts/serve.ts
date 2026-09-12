@@ -3,8 +3,8 @@
 // It serves the files under site/ the way the static site does, including
 // /<slug>/ directory indexes. Saving a file under site/ reloads the browser.
 // Saving a file under src/ first re-runs `pnpm placeholder`, so an edit to
-// src/render.ts shows up without a manual step. That rewrites site/index.html
-// from the seed links, overwriting whatever `pnpm preview` put there.
+// src/render.ts shows up without a manual step. That rewrites every page under
+// site/ from the seed links, overwriting whatever `pnpm preview` put there.
 //
 // The rendered page allows its inline style and script by hash, so the reload
 // client would be blocked. This server rewrites the Content-Security-Policy
@@ -122,7 +122,7 @@ const server = createServer(async (req, res) => {
   res.end(payload);
 });
 
-/** Re-render site/index.html from the seed links. The site watcher reloads. */
+/** Re-render every page under site/ from the seed links. The site watcher reloads. */
 let rendering = false;
 function renderPlaceholder(): void {
   if (rendering) return;

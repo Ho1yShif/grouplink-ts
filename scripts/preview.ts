@@ -20,7 +20,7 @@ import {
   toLinkRows,
   toPersonRows,
   uniqueUrls,
-  visibleInOrder,
+  visibleRows,
 } from "../src/links.js";
 import { renderPage, type LinkCard, type SocialLink } from "../src/render.js";
 
@@ -42,7 +42,7 @@ if (!people.some((person) => person.slug === cfg.defaultSlug)) {
   );
 }
 
-const pages = groupByPerson(visibleInOrder(toLinkRows(linkPages)), people);
+const pages = groupByPerson(visibleRows(toLinkRows(linkPages)), people);
 const rows = pages.flatMap((page) => page.rows);
 const cardUrls = uniqueUrls(rows.filter((row) => row.kind === "link"));
 
@@ -54,6 +54,13 @@ for (let start = 0; start < cardUrls.length; start += BATCH_SIZE) {
   );
   batch.forEach((url, i) => descriptions.set(url, cardDescription(scraped[i] ?? {})));
 }
+
+// The same socials on every page, taken from the root person's rows.
+const socials: SocialLink[] = (
+  pages.find((page) => page.person.slug === cfg.defaultSlug)?.rows ?? []
+)
+  .filter((row) => row.kind === "social")
+  .map((row) => ({ label: row.title, url: row.url }));
 
 for (const page of pages) {
   const html = renderPage({
@@ -67,9 +74,7 @@ for (const page of pages) {
         description: descriptions.get(row.url) ?? "",
         iconUrl: faviconUrl(row.url),
       })),
-    socials: page.rows
-      .filter((row) => row.kind === "social")
-      .map((row): SocialLink => ({ label: row.title, url: row.url })),
+    socials,
   });
 
   const paths = [pagePath(cfg.siteDir, page.person.slug)];

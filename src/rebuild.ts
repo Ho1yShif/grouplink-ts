@@ -18,14 +18,16 @@ import {
   cardDescription,
   faviconUrl,
   groupByPerson,
+  skippedRows,
   metaCacheKey,
   pagePath,
   toLinkRows,
   toPersonRows,
   uniqueUrls,
-  visibleInOrder,
+  visibleRows,
   type LinkRow,
   type PersonPage,
+  type SkippedRow,
 } from "./links.js";
 import { renderPage, type LinkCard, type PageModel, type SocialLink } from "./render.js";
 
@@ -61,6 +63,8 @@ export interface RebuildResult {
   /** Distinct social URLs across every page. */
   socialCount: number;
   cacheHits: number;
+  /** Link rows read from Notion that render on no page, and why. */
+  skipped: SkippedRow[];
   deadLinks: string[];
   committed: boolean;
   /** Paths in the commit. Empty when nothing changed. */
@@ -101,7 +105,13 @@ async function runRebuild(ctx: TaskContext, input: RebuildInput): Promise<Rebuil
       `SITE_DEFAULT_SLUG is "${cfg.defaultSlug}", which matches no Slug in the People database`,
     );
   }
-  const pages = groupByPerson(visibleInOrder(toLinkRows(linkPages)), people);
+  const pages = groupByPerson(visibleRows(toLinkRows(linkPages)), people);
+
+  // A row you added in Notion that never reaches a page is otherwise invisible.
+  const skipped = skippedRows(linkPages, people);
+  for (const row of skipped) {
+    console.log(`skipped "${row.title}": ${row.reason}`);
+  }
 
   // A link on three pages is one URL to look up, scrape, and health-check.
   const rows = pages.flatMap((page) => page.rows);
@@ -151,8 +161,9 @@ async function runRebuild(ctx: TaskContext, input: RebuildInput): Promise<Rebuil
   // 6) Render one file per person, plus a second copy of the default person's page
   //    at the site root, so `/` and `/<default slug>` serve the same thing.
   const files: SiteFile[] = [];
+  const socials = sharedSocials(pages, cfg.defaultSlug);
   for (const page of pages) {
-    const content = renderPage(toModel(page, metaByUrl, cfg));
+    const content = renderPage(toModel(page, metaByUrl, socials));
     files.push({ path: pagePath(cfg.siteDir, page.person.slug), content });
     if (page.person.slug === cfg.defaultSlug) {
       files.push({ path: pagePath(cfg.siteDir, ""), content });
@@ -164,6 +175,7 @@ async function runRebuild(ctx: TaskContext, input: RebuildInput): Promise<Rebuil
     linkCount: cardUrls.length,
     socialCount: socialUrls.length,
     cacheHits: cardUrls.length - missUrls.length,
+    skipped,
     deadLinks,
     committed: false,
     changedPaths: [],
@@ -276,15 +288,22 @@ function readCached(value: string | null | undefined): CachedMeta | null {
   return null;
 }
 
+/**
+ * Every page gets the default person's social row, so the header is identical
+ * across the site. A social row on someone else's page is ignored.
+ */
+function sharedSocials(pages: PersonPage[], defaultSlug: string): SocialLink[] {
+  const root = pages.find((page) => page.person.slug === defaultSlug);
+  return (root?.rows ?? [])
+    .filter((row) => row.kind === "social")
+    .map((row) => ({ label: row.title, url: row.url }));
+}
+
 function toModel(
   page: PersonPage,
   metaByUrl: Map<string, CachedMeta>,
-  cfg: RebuildConfig,
+  socials: SocialLink[],
 ): PageModel {
-  const socials: SocialLink[] = page.rows
-    .filter((row) => row.kind === "social")
-    .map((row) => ({ label: row.title, url: row.url }));
-
   return {
     name: page.person.name,
     tagline: page.person.tagline,

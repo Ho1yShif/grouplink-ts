@@ -43,21 +43,21 @@ const ALEX = "person-alex";
 function rawPage(
   title: string,
   url: string,
-  order: number,
+  /** Only makes the Notion page id unique. */
+  n: number,
   visible: boolean,
   kind: string,
   people: string[] = [SHIFRA],
   everyone = false,
 ) {
   return {
-    id: `p-${order}`,
-    url: `https://www.notion.so/p-${order}`,
+    id: `p-${n}`,
+    url: `https://www.notion.so/p-${n}`,
     created_time: "2026-01-01T00:00:00.000Z",
     last_edited_time: "2026-01-01T00:00:00.000Z",
     properties: {
       Title: titleProp(title),
       URL: { type: "url", url },
-      Order: { type: "number", number: order },
       Visible: { type: "checkbox", checkbox: visible },
       Kind: { type: "select", select: { name: kind } },
       Everyone: { type: "checkbox", checkbox: everyone },
@@ -258,7 +258,7 @@ function harness(fakes: Fakes = {}) {
 }
 
 describe("grouplink.rebuild", () => {
-  it("renders every visible link in order, and no hidden one", async () => {
+  it("renders every visible link in Notion order, and no hidden one", async () => {
     const h = harness();
     const result = await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
 
@@ -324,6 +324,42 @@ describe("grouplink.rebuild", () => {
     expect(files["site/shifra/index.html"]).toContain("Developer relations at Render.");
     expect(files["site/alex/index.html"]).toContain("Alex Rivera");
     expect(files["site/alex/index.html"]).not.toContain("Shifra Williams");
+  });
+
+  it("puts the root person's socials on every page", async () => {
+    const h = harness({
+      links: [
+        ...LINK_PAGES,
+        rawPage("Alex social", "https://x.com/alex", 11, true, "Social", [ALEX]),
+      ],
+    });
+    await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
+    const files = h.committed();
+
+    expect(files["site/alex/index.html"]).toContain("https://x.com/render");
+    expect(files["site/alex/index.html"]).not.toContain("https://x.com/alex");
+  });
+
+  it("reports why a row renders on no page", async () => {
+    const h = harness({
+      links: [
+        ...LINK_PAGES,
+        rawPage("Orphan", "https://example.com/orphan", 20, true, "Link", []),
+        rawPage("No URL", "", 21, true, "Link"),
+      ],
+    });
+    const result = await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
+
+    expect(result.skipped).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ title: "Hidden", reason: "Visible is unchecked" }),
+        expect.objectContaining({
+          title: "Orphan",
+          reason: "no People relation and Everyone is unchecked",
+        }),
+        expect.objectContaining({ title: "No URL", reason: "no URL" }),
+      ]),
+    );
   });
 
   it("serves the default person at the root, byte for byte", async () => {

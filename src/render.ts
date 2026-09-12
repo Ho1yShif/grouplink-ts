@@ -30,9 +30,10 @@ export interface SocialLink {
 
 export interface PageModel {
   name: string;
-  /** A newline becomes a line break on the page, and a space in the metadata. */
+  /** Metadata only. The page does not show it. */
   tagline: string;
   cards: LinkCard[];
+  /** Same list on every page, so the header does not change between people. */
   socials: SocialLink[];
 }
 
@@ -187,14 +188,6 @@ body {
   mask: url('/assets/render-logo-white.png') center / contain no-repeat;
 }
 
-.tagline {
-  margin: 0;
-  font-size: 18px;
-  line-height: 26px;
-  color: var(--text-secondary);
-  max-width: 40ch;
-}
-
 .links { border-top: 1px solid var(--border); }
 
 .card {
@@ -298,7 +291,7 @@ ${ROW_STAGGER}
   justify-content: center;
   flex-wrap: wrap;
   gap: 20px;
-  /* Adds to the .masthead gap, so the icons clear the tagline. */
+  /* Adds to the .masthead gap, so the icons clear the logo. */
   margin-top: 8px;
 }
 
@@ -450,7 +443,6 @@ function renderSocial(social: SocialLink): string {
 
 export function renderPage(model: PageModel): string {
   const taglineText = model.tagline.replace(/\s*\r?\n\s*/g, " ").trim();
-  const taglineHtml = escapeHtml(model.tagline.trim()).replace(/\r?\n/g, "<br>");
   const cards = model.cards.map((card, i) => renderCard(card, i)).join("\n");
   const socials = model.socials.map(renderSocial).join("\n");
   const socialsBlock = socials
@@ -478,7 +470,6 @@ ${socials}
   <main class="page">
     <header class="masthead">
       <h1 class="name"><a class="logo-link" href="${LOGO_HREF}" aria-label="${escapeHtml(model.name)}"><span class="logo"></span></a></h1>
-      <p class="tagline">${taglineHtml}</p>
 ${socialsBlock}
     </header>
 

@@ -5,7 +5,7 @@ import {
   faviconUrl,
   groupByPerson,
   toLinkRows,
-  visibleInOrder,
+  visibleRows,
 } from "../src/links.js";
 import type { PageDTO } from "@render-lab/tasks-notion";
 
@@ -50,9 +50,9 @@ describe("renderPage", () => {
     expect(html).toContain('href="#"');
   });
 
-  it("breaks the tagline on a newline, but keeps the metadata on one line", () => {
+  it("keeps the tagline out of the page and on one line in the metadata", () => {
     const html = renderPage({ ...model, tagline: "First half\nsecond half" });
-    expect(html).toContain('<p class="tagline">First half<br>second half</p>');
+    expect(html).not.toContain('class="tagline"');
     expect(html).toContain('<meta name="description" content="First half second half">');
   });
 
@@ -140,13 +140,13 @@ function page(props: Record<string, unknown>, title: string): PageDTO {
   };
 }
 
-describe("toLinkRows / visibleInOrder", () => {
+describe("toLinkRows / visibleRows", () => {
   const pages = [
-    page({ URL: "https://b.example", Order: 2, Visible: true, Kind: "Link" }, "B"),
-    page({ URL: "https://a.example", Order: 1, Visible: true, Kind: "Link" }, "A"),
-    page({ URL: "https://hidden.example", Order: 3, Visible: false, Kind: "Link" }, "Hidden"),
-    page({ URL: "https://x.com/render", Order: 10, Visible: true, Kind: "Social" }, "X"),
-    page({ URL: "", Order: 4, Visible: true, Kind: "Link" }, "No URL"),
+    page({ URL: "https://b.example", Visible: true, Kind: "Link" }, "B"),
+    page({ URL: "https://a.example", Visible: true, Kind: "Link" }, "A"),
+    page({ URL: "https://hidden.example", Visible: false, Kind: "Link" }, "Hidden"),
+    page({ URL: "https://x.com/render", Visible: true, Kind: "Social" }, "X"),
+    page({ URL: "", Visible: true, Kind: "Link" }, "No URL"),
   ];
 
   it("reads the URL property, not the Notion page URL", () => {
@@ -157,12 +157,12 @@ describe("toLinkRows / visibleInOrder", () => {
     expect(toLinkRows(pages).map((r) => r.title)).not.toContain("No URL");
   });
 
-  it("sorts by Order and drops hidden rows", () => {
-    expect(visibleInOrder(toLinkRows(pages)).map((r) => r.title)).toEqual(["A", "B", "X"]);
+  it("keeps the Notion order and drops hidden rows", () => {
+    expect(visibleRows(toLinkRows(pages)).map((r) => r.title)).toEqual(["B", "A", "X"]);
   });
 
   it("reads Kind as a social flag", () => {
-    const social = visibleInOrder(toLinkRows(pages)).find((r) => r.title === "X");
+    const social = visibleRows(toLinkRows(pages)).find((r) => r.title === "X");
     expect(social?.kind).toBe("social");
   });
 });
