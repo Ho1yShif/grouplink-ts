@@ -14,6 +14,7 @@ import { triggerDeploy, awaitDeploy } from "@render-lab/tasks-render";
 import { postMessage } from "@render-lab/tasks-slack";
 
 import { assertWritable, loadConfig, type RebuildConfig, type RebuildInput } from "./config.js";
+import { DEFAULT_ICON } from "./icons.js";
 import {
   cardDescription,
   faviconUrl,
@@ -24,6 +25,7 @@ import {
   toLinkRows,
   toPersonRows,
   uniqueUrls,
+  unknownIcons,
   visibleRows,
   type LinkRow,
   type PersonPage,
@@ -109,6 +111,11 @@ async function runRebuild(ctx: TaskContext, input: RebuildInput): Promise<Rebuil
   const skipped = skippedRows(linkPages, people);
   for (const row of skipped) {
     console.log(`skipped "${row.title}": ${row.reason}`);
+  }
+
+  // An Icon option with no matching file renders the default and is otherwise silent.
+  for (const name of unknownIcons(linkPages)) {
+    console.log(`unknown Icon "${name}", using ${DEFAULT_ICON}`);
   }
 
   // A link on three pages is one URL to look up, scrape, and health-check.
@@ -296,6 +303,7 @@ function toCard(row: LinkRow, meta: CachedMeta | undefined): LinkCard {
     url: row.url,
     description: meta?.description ?? "",
     iconUrl: faviconUrl(row.url),
+    icon: row.icon,
   };
 }
 

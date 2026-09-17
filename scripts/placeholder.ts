@@ -6,21 +6,23 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { IconName } from "../src/icons.js";
 import { faviconUrl, pagePath } from "../src/links.js";
 import { renderPage, type LinkCard } from "../src/render.js";
 
 interface SeedPerson {
   name: string;
   slug: string;
-  links: Array<{ title: string; url: string }>;
+  links: Array<{ title: string; url: string; icon: IconName }>;
 }
 
-const SHARED = [
+const SHARED: SeedPerson["links"] = [
   {
     title: "Funded founder? Apply to the Render startup program",
     url: "https://render.com/startups",
+    icon: "form",
   },
-  { title: "Website", url: "https://render.com/" },
+  { title: "Website", url: "https://render.com/", icon: "render" },
 ];
 
 const PEOPLE: SeedPerson[] = [
@@ -32,13 +34,17 @@ const PEOPLE: SeedPerson[] = [
       {
         title: "Tutorial | Get started with Render Workflows",
         url: "https://render.com/tutorials/render-workflows",
+        icon: "workflows",
       },
     ],
   },
   {
     name: "Graham",
     slug: "graham",
-    links: [...SHARED, { title: "Docs", url: "https://render.com/docs" }],
+    links: [
+      ...SHARED,
+      { title: "Docs", url: "https://render.com/docs", icon: "info" },
+    ],
   },
 ];
 
@@ -57,6 +63,7 @@ for (const person of PEOPLE) {
         url: link.url,
         description: "",
         iconUrl: faviconUrl(link.url),
+        icon: link.icon,
       }),
     ),
   });

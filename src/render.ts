@@ -11,6 +11,7 @@
 // rather than a render.yaml header so the hashes cannot drift from the content
 // they cover.
 import { createHash } from "node:crypto";
+import { ICON_NAMES, type IconName } from "./icons.js";
 
 export interface LinkCard {
   /** Display text. Comes from Notion, not from the scrape. */
@@ -21,6 +22,8 @@ export interface LinkCard {
   description: string;
   /** `<origin>/favicon.ico`, hidden on error. */
   iconUrl: string;
+  /** Which file under site/assets/link-icons the card draws in its left column. */
+  icon: IconName;
 }
 
 export interface SocialLink {
@@ -65,6 +68,14 @@ export function safeUrl(value: string): string {
 const ROW_STAGGER = Array.from(
   { length: 20 },
   (_, i) => `.card:nth-child(${i + 1}) { animation-delay: ${i * 30}ms; }`,
+).join("\n");
+
+/*
+ * One mask rule per icon file. Generated into the <style> block because the
+ * policy allows that block by hash and no style attribute at all.
+ */
+const ICON_MASKS = ICON_NAMES.map(
+  (name) => `.card__mark--${name} { --mark: url('/assets/link-icons/${name}.png'); }`,
 ).join("\n");
 
 const STYLES = `
@@ -188,7 +199,7 @@ body {
 
 .card {
   display: grid;
-  grid-template-columns: 32px 1fr 18px;
+  grid-template-columns: 32px 1fr;
   align-items: start;
   gap: 16px;
   padding: 18px 12px;
@@ -204,15 +215,20 @@ ${ROW_STAGGER}
 .card:focus-visible { background: var(--row-hover); }
 .card:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
-.card__index {
-  font-family: var(--font-mono);
-  font-weight: 500;
-  font-size: 13.2px;
-  line-height: 26.4px;
-  letter-spacing: 0.02em;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-faint);
+/*
+ * The icon files are dark artwork on transparency, so an <img> would disappear
+ * against the dark background. Each one is a mask instead, painted with the
+ * faint text color. The top margin sits the 20px square on the title's cap line.
+ */
+.card__mark {
+  width: 20px;
+  height: 20px;
+  margin-top: 3px;
+  background-color: var(--text-faint);
+  -webkit-mask: var(--mark) center / contain no-repeat;
+  mask: var(--mark) center / contain no-repeat;
 }
+${ICON_MASKS}
 
 .card__body { display: block; }
 
@@ -269,14 +285,6 @@ ${ROW_STAGGER}
   color: var(--text-faint);
   overflow-wrap: anywhere;
 }
-
-.card__arrow {
-  color: var(--text-faint);
-  font-size: 17.6px;
-  line-height: 26.4px;
-  transition: transform 150ms var(--ease), color 0s;
-}
-.card:hover .card__arrow { transform: translateX(2px); }
 
 .footer {
   font-family: var(--font-mono);
@@ -337,12 +345,12 @@ ${ROW_STAGGER}
   .masthead { margin-bottom: 28px; }
   .socials { margin-top: 20px; }
   .logo { width: 190px; height: 36px; }
-  .card { grid-template-columns: 24px 1fr 18px; gap: 12px; padding: 16px 4px; min-height: 44px; }
+  .card { grid-template-columns: 24px 1fr; gap: 12px; padding: 16px 4px; min-height: 44px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .masthead, .card { animation: none; }
-  .card__title, .card__arrow { transition: none; }
+  .card__title { transition: none; }
 }
 `;
 
@@ -397,28 +405,26 @@ function displayTarget(url: string): string {
   return target.length > MAX_TARGET ? target.slice(0, MAX_TARGET - 1) + "\u2026" : target;
 }
 
-function renderCard(card: LinkCard, index: number): string {
+function renderCard(card: LinkCard): string {
   const href = escapeHtml(safeUrl(card.url));
   const title = escapeHtml(card.title);
-  const number = String(index + 1).padStart(2, "0");
   const desc = card.description
     ? `<span class="card__desc">${escapeHtml(card.description)}</span>`
     : "";
-  const icon = card.iconUrl
+  const favicon = card.iconUrl
     ? `<img class="card__icon" src="${escapeHtml(safeUrl(card.iconUrl))}" alt="" loading="lazy">`
     : "";
   const target = displayTarget(card.url);
   const meta = target
-    ? `<span class="card__meta">${icon}<span class="card__target">${escapeHtml(target)}</span></span>`
+    ? `<span class="card__meta">${favicon}<span class="card__target">${escapeHtml(target)}</span></span>`
     : "";
   return `      <a class="card" href="${href}">
-        <span class="card__index" aria-hidden="true">${number}</span>
+        <span class="card__mark card__mark--${escapeHtml(card.icon)}" aria-hidden="true"></span>
         <span class="card__body">
           <span class="card__title">${title}</span>
           ${desc}
           ${meta}
         </span>
-        <span class="card__arrow" aria-hidden="true">&#8594;</span>
       </a>`;
 }
 
@@ -448,7 +454,7 @@ function renderSocial(social: SocialLink): string {
 export function renderPage(model: PageModel): string {
   const year = new Date().getFullYear();
   const taglineText = model.tagline.replace(/\s*\r?\n\s*/g, " ").trim();
-  const cards = model.cards.map((card, i) => renderCard(card, i)).join("\n");
+  const cards = model.cards.map(renderCard).join("\n");
   const socialsBlock = `      <nav class="socials" aria-label="Social">
 ${SOCIALS.map(renderSocial).join("\n")}
       </nav>`;

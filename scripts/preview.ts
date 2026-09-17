@@ -65,6 +65,7 @@ for (const page of pages) {
         url: row.url,
         description: descriptions.get(row.url) ?? "",
         iconUrl: faviconUrl(row.url),
+        icon: row.icon,
       }),
     ),
   });

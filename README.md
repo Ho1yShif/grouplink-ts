@@ -102,6 +102,7 @@ There are two. Links:
 | ---------- | -------- | ------------------------------------------------------------------------------ |
 | `Title`    | title    | Card text. Not scraped — this is the copy you control.                         |
 | `URL`      | url      | Where the card points.                                                         |
+| `Icon`     | select   | Which icon the card shows. Empty means `arrow`.                                |
 | `Visible`  | checkbox | Unchecked rows are dropped.                                                    |
 | `Everyone` | checkbox | Checked puts the link on every person's page.                                  |
 | `People`   | relation | Which pages the link appears on. Relate it to two rows and it appears on both. |
@@ -113,6 +114,19 @@ People:
 | `Name`    | title | The heading on that person's page.          |
 | `Slug`    | text  | The URL path. `shifra` serves at `/shifra`. |
 | `Tagline` | text  | The page description in the metadata. Not shown on the page. |
+
+### Icons
+
+Each card draws an icon from `site/assets/link-icons/`. The `Icon` select option
+is the filename without `.png`, so the options are `arrow`, `credits`,
+`download`, `form`, `info`, `render`, `upload`, and `workflows`. An empty cell
+renders `arrow`. An option no file matches also renders `arrow`, and the run logs
+the value it could not place.
+
+The files are dark artwork on transparency, drawn as CSS masks and painted with
+the text color, so they read on both the light and the dark background. To add
+one, drop a 32×32 RGBA PNG in that directory, add its name to `ICON_NAMES` in
+`src/icons.ts`, and add the option to the Notion dropdown.
 
 A link's audience is `Everyone` plus whatever `People` names. A row with both set
 is redundant, not contradictory, and a row with neither renders nowhere.

@@ -40,14 +40,27 @@ const titleProp = (text: string) => ({ type: "title", title: [{ plain_text: text
 const SHIFRA = "person-shifra";
 const ALEX = "person-alex";
 
+/** Everything about a link row that most cases leave at its default. */
+interface RawPageOptions {
+  visible?: boolean;
+  /** Notion page ids of the People rows the link relates to. */
+  people?: string[];
+  everyone?: boolean;
+  /** The Icon select option. null is an empty cell. */
+  icon?: string | null;
+}
+
 function rawPage(
   title: string,
   url: string,
   /** Only makes the Notion page id unique. */
   n: number,
-  visible: boolean,
-  people: string[] = [SHIFRA],
-  everyone = false,
+  {
+    visible = true,
+    people = [SHIFRA],
+    everyone = false,
+    icon = null,
+  }: RawPageOptions = {},
 ) {
   return {
     id: `p-${n}`,
@@ -60,6 +73,7 @@ function rawPage(
       Visible: { type: "checkbox", checkbox: visible },
       Everyone: { type: "checkbox", checkbox: everyone },
       People: { type: "relation", relation: people.map((id) => ({ id })) },
+      Icon: { type: "select", select: icon === null ? null : { name: icon } },
     },
   };
 }
@@ -80,10 +94,10 @@ function rawPerson(id: string, name: string, slug: string, tagline: string) {
 
 const LINK_PAGES = [
   // Shared by both people, so it must be scraped and checked exactly once.
-  rawPage("Discord", "https://discord.com/invite/x", 1, true, [SHIFRA, ALEX]),
-  rawPage("Startups", "https://render.com/startups", 2, true),
-  rawPage("Hidden", "https://render.com/secret", 3, false),
-  rawPage("Alex only", "https://example.com/alex", 4, true, [ALEX]),
+  rawPage("Discord", "https://discord.com/invite/x", 1, { people: [SHIFRA, ALEX] }),
+  rawPage("Startups", "https://render.com/startups", 2),
+  rawPage("Hidden", "https://render.com/secret", 3, { visible: false }),
+  rawPage("Alex only", "https://example.com/alex", 4, { people: [ALEX] }),
 ];
 
 const PEOPLE_PAGES = [
@@ -268,6 +282,22 @@ describe("grouplink.rebuild", () => {
     expect(html).not.toContain("render.com/secret");
   });
 
+  it("renders the icon the Notion row names, and arrow for the rest", async () => {
+    const h = harness({
+      links: [
+        rawPage("Workflows", "https://render.com/workflows", 1, { icon: "workflows" }),
+        rawPage("Docs", "https://render.com/docs", 2),
+      ],
+    });
+    const result = await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
+
+    expect(result.committed).toBe(true);
+    const html = h.committedHtml();
+    // The bare class name is in the stylesheet on every page, so match the span.
+    expect(html).toContain('class="card__mark card__mark--workflows"');
+    expect(html).toContain('class="card__mark card__mark--arrow"');
+  });
+
   it("puts a person's links in their own file and nobody else's", async () => {
     const h = harness();
     await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
@@ -286,7 +316,7 @@ describe("grouplink.rebuild", () => {
     const h = harness({
       links: [
         ...LINK_PAGES,
-        rawPage("Careers", "https://render.com/careers", 5, true, [], true),
+        rawPage("Careers", "https://render.com/careers", 5, { people: [], everyone: true }),
       ],
     });
     await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
@@ -300,7 +330,7 @@ describe("grouplink.rebuild", () => {
     const h = harness({
       links: [
         ...LINK_PAGES,
-        rawPage("Careers", "https://render.com/careers", 5, true, [], true),
+        rawPage("Careers", "https://render.com/careers", 5, { people: [], everyone: true }),
       ],
     });
     await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
@@ -325,8 +355,8 @@ describe("grouplink.rebuild", () => {
     const h = harness({
       links: [
         ...LINK_PAGES,
-        rawPage("Orphan", "https://example.com/orphan", 20, true, []),
-        rawPage("No URL", "", 21, true),
+        rawPage("Orphan", "https://example.com/orphan", 20, { people: [] }),
+        rawPage("No URL", "", 21),
       ],
     });
     const result = await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
@@ -488,7 +518,7 @@ describe("grouplink.rebuild", () => {
 
   it("scrapes in batches instead of opening one run per link", async () => {
     const links = Array.from({ length: 25 }, (_, i) =>
-      rawPage(`Link ${i}`, `https://example.com/${i}`, i, true),
+      rawPage(`Link ${i}`, `https://example.com/${i}`, i),
     );
     const h = harness({ links });
     const result = await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));

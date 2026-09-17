@@ -4,17 +4,20 @@ import { escapeHtml, renderPage, safeUrl, type PageModel } from "../src/render.j
 import {
   faviconUrl,
   groupByPerson,
+  toIconName,
   toLinkRows,
+  unknownIcons,
   visibleRows,
 } from "../src/links.js";
+import { ICON_NAMES } from "../src/icons.js";
 import type { PageDTO } from "@render-lab/tasks-notion";
 
 const model: PageModel = {
   name: "Render",
   tagline: "Cloud application hosting for developers.",
   cards: [
-    { title: "First", url: "https://example.com/a", description: "A", iconUrl: "https://example.com/favicon.ico" },
-    { title: "Second", url: "https://example.com/b", description: "", iconUrl: "" },
+    { title: "First", url: "https://example.com/a", description: "A", iconUrl: "https://example.com/favicon.ico", icon: "workflows" },
+    { title: "Second", url: "https://example.com/b", description: "", iconUrl: "", icon: "arrow" },
   ],
 };
 
@@ -33,7 +36,7 @@ describe("renderPage", () => {
   it("escapes titles and descriptions", () => {
     const html = renderPage({
       ...model,
-      cards: [{ title: '<script>alert(1)</script>', url: "https://example.com", description: 'a "b" & c', iconUrl: "" }],
+      cards: [{ title: '<script>alert(1)</script>', url: "https://example.com", description: 'a "b" & c', iconUrl: "", icon: "arrow" }],
     });
     expect(html).not.toContain("<script>alert(1)</script>");
     expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
@@ -43,7 +46,7 @@ describe("renderPage", () => {
   it("drops a javascript: href", () => {
     const html = renderPage({
       ...model,
-      cards: [{ title: "Bad", url: "javascript:alert(1)", description: "", iconUrl: "" }],
+      cards: [{ title: "Bad", url: "javascript:alert(1)", description: "", iconUrl: "", icon: "arrow" }],
     });
     expect(html).not.toContain("javascript:");
     expect(html).toContain('href="#"');
@@ -57,6 +60,21 @@ describe("renderPage", () => {
 
   it("always renders the same icon row, whatever the model holds", () => {
     expect(renderPage(model)).toContain('class="social__icon social__icon--github"');
+  });
+
+  it("draws each card's icon and no index number", () => {
+    const html = renderPage(model);
+    expect(html).toContain('class="card__mark card__mark--workflows"');
+    expect(html).toContain('class="card__mark card__mark--arrow"');
+    expect(html).not.toContain("card__index");
+    expect(html).not.toContain(">01<");
+  });
+
+  it("declares a mask rule for every icon in the library", () => {
+    const html = renderPage(model);
+    for (const name of ICON_NAMES) {
+      expect(html).toContain(`.card__mark--${name} { --mark: url('/assets/link-icons/${name}.png'); }`);
+    }
   });
 
   it("declares both color schemes and no bold weight", () => {
@@ -198,5 +216,42 @@ describe("groupByPerson", () => {
   it("renders a row related to nobody nowhere", () => {
     expect(titlesFor("shifra")).not.toContain("Related to nobody");
     expect(titlesFor("alex")).not.toContain("Related to nobody");
+  });
+});
+
+describe("toIconName", () => {
+  it("maps a dropdown option to its filename, case-insensitively", () => {
+    expect(toIconName("workflows")).toBe("workflows");
+    expect(toIconName("Upload")).toBe("upload");
+    expect(toIconName("  form  ")).toBe("form");
+  });
+
+  it("falls back to arrow for an empty cell or an unknown option", () => {
+    expect(toIconName(null)).toBe("arrow");
+    expect(toIconName("")).toBe("arrow");
+    expect(toIconName("workflow")).toBe("arrow");
+    expect(toIconName(42)).toBe("arrow");
+  });
+});
+
+describe("unknownIcons", () => {
+  it("names every option with no matching file, once each", () => {
+    const pages = [
+      page({ URL: "https://a.example", Icon: "workflow" }, "A"),
+      page({ URL: "https://b.example", Icon: "workflow" }, "B"),
+      page({ URL: "https://c.example", Icon: "upload" }, "C"),
+      page({ URL: "https://d.example" }, "D"),
+    ];
+    expect(unknownIcons(pages)).toEqual(["workflow"]);
+  });
+});
+
+describe("toLinkRows icons", () => {
+  it("reads the Icon column and defaults to arrow", () => {
+    const rows = toLinkRows([
+      page({ URL: "https://a.example", Icon: "render" }, "A"),
+      page({ URL: "https://b.example" }, "B"),
+    ]);
+    expect(rows.map((row) => row.icon)).toEqual(["render", "arrow"]);
   });
 });

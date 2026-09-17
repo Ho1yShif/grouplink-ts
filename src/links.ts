@@ -1,5 +1,21 @@
 // Notion rows in, page model out. Pure functions — no network, no ctx.
 import type { PageDTO } from "@render-lab/tasks-notion";
+import { DEFAULT_ICON, isIconName, type IconName } from "./icons.js";
+
+function readString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+/** Notion flattens a select property to the option name, or null when empty. */
+function readIconOption(value: unknown): string {
+  return readString(value).toLowerCase();
+}
+
+/** The icon a link row draws, whatever its Icon cell holds. */
+export function toIconName(value: unknown): IconName {
+  const name = readIconOption(value);
+  return isIconName(name) ? name : DEFAULT_ICON;
+}
 
 export interface LinkRow {
   title: string;
@@ -9,6 +25,8 @@ export interface LinkRow {
   everyone: boolean;
   /** Notion page ids of the People rows this link belongs to. */
   personIds: string[];
+  /** Which file under site/assets/link-icons the card draws. */
+  icon: IconName;
 }
 
 /** One row of the People database. `id` is what a link's relation points at. */
@@ -23,10 +41,6 @@ export interface PersonRow {
 export interface PersonPage {
   person: PersonRow;
   rows: LinkRow[];
-}
-
-function readString(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 /**
@@ -48,7 +62,9 @@ export function toLinkRows(pages: PageDTO[]): LinkRow[] {
     const related = props["People"];
     const personIds = Array.isArray(related) ? related : [];
 
-    rows.push({ title, url, visible, everyone, personIds });
+    const icon = toIconName(props["Icon"]);
+
+    rows.push({ title, url, visible, everyone, personIds, icon });
   }
 
   return rows;
@@ -99,6 +115,23 @@ export function skippedRows(pages: PageDTO[], people: PersonRow[]): SkippedRow[]
   }
 
   return skipped;
+}
+
+/**
+ * Icon options Notion holds that no file matches. Those rows render the default,
+ * so the value is otherwise invisible. Reads every row, including hidden ones,
+ * because an option with no file is a Notion mistake either way. Distinct,
+ * first-seen order.
+ */
+export function unknownIcons(pages: PageDTO[]): string[] {
+  const seen = new Set<string>();
+
+  for (const page of pages) {
+    const raw = readIconOption(page.properties["Icon"]);
+    if (raw && !isIconName(raw)) seen.add(raw);
+  }
+
+  return [...seen];
 }
 
 /**
