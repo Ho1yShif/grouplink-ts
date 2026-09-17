@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' https:; style-src 'sha256-An/eU4S0wrXmE6ifnbZpesypnGf5iiQm/3aPLU0kgFE='; script-src 'sha256-nsmyq4665IeAl+Jlo+x36bCB9QoTOCItVFJQEtSIlhM='; font-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' https:; style-src 'sha256-VcRDsuAxAGmP3BTwC5kTI1mkG4IGQj9Waj+PL8CyzPU='; script-src 'sha256-nsmyq4665IeAl+Jlo+x36bCB9QoTOCItVFJQEtSIlhM='; font-src 'self'; base-uri 'none'; form-action 'none'">
 <title>Render Links</title>
 <meta name="description" content="The fastest path to production for full-stack applications and agents">
 <meta property="og:title" content="Graham — links">
@@ -113,7 +113,6 @@ body {
   display: block;
   color: var(--text);
 }
-.logo-link:hover { color: var(--link); }
 .logo-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 
 /*
@@ -125,7 +124,6 @@ body {
   width: 240px;
   height: 46px;
   background-color: currentColor;
-  transition: background-color 150ms var(--ease);
   -webkit-mask: url('/assets/render-logo-white.png') center / contain no-repeat;
   mask: url('/assets/render-logo-white.png') center / contain no-repeat;
 }
@@ -134,7 +132,7 @@ body {
 
 .card {
   display: grid;
-  grid-template-columns: 32px 1fr 16px;
+  grid-template-columns: 32px 1fr 18px;
   align-items: start;
   gap: 16px;
   padding: 18px 12px;
@@ -172,8 +170,8 @@ body {
 .card__index {
   font-family: var(--font-mono);
   font-weight: 500;
-  font-size: 12px;
-  line-height: 24px;
+  font-size: 13.2px;
+  line-height: 26.4px;
   letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
   color: var(--text-faint);
@@ -190,8 +188,8 @@ body {
  */
 .card__title {
   display: inline;
-  font-size: 16px;
-  line-height: 24px;
+  font-size: 17.6px;
+  line-height: 26.4px;
   background-image: linear-gradient(var(--link), var(--link));
   background-repeat: no-repeat;
   background-position: right bottom;
@@ -205,8 +203,8 @@ body {
 }
 .card__desc {
   margin: 4px 0 0;
-  font-size: 14px;
-  line-height: 20px;
+  font-size: 15.4px;
+  line-height: 22px;
   color: var(--text-faint);
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -228,19 +226,28 @@ body {
 .card__target {
   font-family: var(--font-mono);
   font-weight: 500;
-  font-size: 11px;
-  line-height: 14px;
-  letter-spacing: 0.02em;
+  font-size: 12.1px;
+  line-height: 15.4px;
+  letter-spacing: 0;
   color: var(--text-faint);
   overflow-wrap: anywhere;
 }
 
 .card__arrow {
   color: var(--text-faint);
-  line-height: 24px;
+  font-size: 17.6px;
+  line-height: 26.4px;
   transition: transform 150ms var(--ease), color 0s;
 }
 .card:hover .card__arrow { transform: translateX(2px); }
+
+.footer {
+  font-family: var(--font-mono);
+  font-size: 12.1px;
+  line-height: 15.4px;
+  letter-spacing: 0.02em;
+  color: var(--text-faint);
+}
 
 @keyframes row-fade {
   from { opacity: 0; }
@@ -253,7 +260,7 @@ body {
   flex-wrap: wrap;
   gap: 20px;
   /* Adds to the .masthead gap, so the icons clear the logo. */
-  margin-top: 8px;
+  margin-top: 28px;
 }
 
 .social {
@@ -261,7 +268,6 @@ body {
   color: var(--text);
   text-decoration: none;
 }
-.social:hover { color: var(--link); }
 .social:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 
 /*
@@ -275,26 +281,31 @@ body {
   background-color: currentColor;
   -webkit-mask: var(--icon) center / contain no-repeat;
   mask: var(--icon) center / contain no-repeat;
-  transition: background-color 150ms var(--ease);
+  /*
+   * Every icon fills its 24x24 viewBox, but the artwork inside leaves a
+   * different amount of empty space below it. --nudge is that space, so the
+   * drawn bottoms line up across the row.
+   */
+  transform: translateY(var(--nudge, 0));
 }
 
-.social__icon--youtube { --icon: url('/assets/icons/youtube.svg'); }
+.social__icon--youtube { --icon: url('/assets/icons/youtube.svg'); --nudge: 3.5px; }
 .social__icon--linkedin { --icon: url('/assets/icons/linkedin.svg'); }
 .social__icon--x { --icon: url('/assets/icons/x.svg'); }
-.social__icon--github { --icon: url('/assets/icons/github.svg'); }
-.social__icon--discord { --icon: url('/assets/icons/discord.svg'); }
+.social__icon--github { --icon: url('/assets/icons/github.svg'); --nudge: 0.3px; }
+.social__icon--discord { --icon: url('/assets/icons/discord.svg'); --nudge: 2.9px; }
 
 @media (max-width: 767px) {
   .page { padding: 48px 16px 40px; gap: 32px; }
   .masthead { margin-bottom: 28px; }
+  .socials { margin-top: 20px; }
   .logo { width: 190px; height: 36px; }
-  .card { grid-template-columns: 24px 1fr 16px; gap: 12px; padding: 16px 4px; min-height: 44px; }
+  .card { grid-template-columns: 24px 1fr 18px; gap: 12px; padding: 16px 4px; min-height: 44px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .masthead, .card { animation: none; }
   .card__title, .card__arrow { transition: none; }
-  .logo, .social__icon { transition: none; }
 }
 </style>
 </head>
@@ -342,6 +353,8 @@ body {
       </a>
       </div>
     </section>
+
+    <footer class="footer">&copy; 2026 render.com</footer>
   </main>
 <script>
 addEventListener('error', function (event) {
