@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' https:; style-src 'sha256-UxkixkPAKhdWpGRvU0GLLekalN5pzLAQL87/3DgO0Yo='; script-src 'sha256-nsmyq4665IeAl+Jlo+x36bCB9QoTOCItVFJQEtSIlhM='; font-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' https:; style-src 'sha256-An/eU4S0wrXmE6ifnbZpesypnGf5iiQm/3aPLU0kgFE='; script-src 'sha256-nsmyq4665IeAl+Jlo+x36bCB9QoTOCItVFJQEtSIlhM='; font-src 'self'; base-uri 'none'; form-action 'none'">
 <title>Render Links</title>
-<meta name="description" content="Founding DevRel @ Render">
+<meta name="description" content="The fastest path to production for full-stack applications and agents">
 <meta property="og:title" content="Shifra — links">
-<meta property="og:description" content="Founding DevRel @ Render">
+<meta property="og:description" content="The fastest path to production for full-stack applications and agents">
 <meta property="og:type" content="website">
 <link rel="icon" href="/assets/render-logomark-black.svg" media="(prefers-color-scheme: light)">
 <link rel="icon" href="/assets/render-logomark-white.svg" media="(prefers-color-scheme: dark)">
@@ -128,14 +128,6 @@ body {
   transition: background-color 150ms var(--ease);
   -webkit-mask: url('/assets/render-logo-white.png') center / contain no-repeat;
   mask: url('/assets/render-logo-white.png') center / contain no-repeat;
-}
-
-.tagline {
-  margin: 0;
-  font-size: 18px;
-  line-height: 26px;
-  color: var(--text-secondary);
-  max-width: 40ch;
 }
 
 .links { border-top: 1px solid var(--border); }
@@ -260,7 +252,7 @@ body {
   justify-content: center;
   flex-wrap: wrap;
   gap: 20px;
-  /* Adds to the .masthead gap, so the icons clear the tagline. */
+  /* Adds to the .masthead gap, so the icons clear the logo. */
   margin-top: 8px;
 }
 
@@ -292,18 +284,6 @@ body {
 .social__icon--github { --icon: url('/assets/icons/github.svg'); }
 .social__icon--discord { --icon: url('/assets/icons/discord.svg'); }
 
-/* A label with no icon file keeps the old wordmark treatment. */
-.social--text {
-  font-family: var(--font-mono);
-  font-weight: 500;
-  font-size: 12px;
-  line-height: 24px;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: var(--link);
-}
-.social--text:hover { color: var(--link-hover); }
-
 @media (max-width: 767px) {
   .page { padding: 48px 16px 40px; gap: 32px; }
   .masthead { margin-bottom: 28px; }
@@ -322,9 +302,12 @@ body {
   <main class="page">
     <header class="masthead">
       <h1 class="name"><a class="logo-link" href="https://dashboard.render.com/" aria-label="Shifra"><span class="logo"></span></a></h1>
-      <p class="tagline">Founding DevRel @ Render</p>
       <nav class="socials" aria-label="Social">
-        <a class="social social--text" href="http://render.com/">Website</a>
+        <a class="social" href="https://www.youtube.com/@render-inc" aria-label="YouTube"><span class="social__icon social__icon--youtube"></span></a>
+        <a class="social" href="https://www.linkedin.com/company/renderco" aria-label="LinkedIn"><span class="social__icon social__icon--linkedin"></span></a>
+        <a class="social" href="https://x.com/render" aria-label="X"><span class="social__icon social__icon--x"></span></a>
+        <a class="social" href="https://github.com/render-oss/sdk" aria-label="GitHub"><span class="social__icon social__icon--github"></span></a>
+        <a class="social" href="https://render.com/discord" aria-label="Discord"><span class="social__icon social__icon--discord"></span></a>
       </nav>
     </header>
 
@@ -334,26 +317,26 @@ body {
         <span class="card__index" aria-hidden="true">01</span>
         <span class="card__body">
           <span class="card__title">Funded founder? Apply to the Render startup program</span>
-          <span class="card__desc">Build and scale your startup&#39;s apps and agents on infrastructure developers love, and get up to $100,000 in credits through Render for Startups.</span>
+          
           <span class="card__meta"><img class="card__icon" src="https://render.com/favicon.ico" alt="" loading="lazy"><span class="card__target">render.com/startups</span></span>
         </span>
         <span class="card__arrow" aria-hidden="true">&#8594;</span>
       </a>
-      <a class="card" href="https://render.com/tutorials/render-workflows">
+      <a class="card" href="https://render.com/">
         <span class="card__index" aria-hidden="true">02</span>
         <span class="card__body">
-          <span class="card__title">Tutorial | Get started with Render Workflows</span>
-          <span class="card__desc">Scaffold a Render Workflow, write your first task, run it locally, and deploy it — in Python or TypeScript.</span>
-          <span class="card__meta"><img class="card__icon" src="https://render.com/favicon.ico" alt="" loading="lazy"><span class="card__target">render.com/tutorials/render-workflows</span></span>
+          <span class="card__title">Website</span>
+          
+          <span class="card__meta"><img class="card__icon" src="https://render.com/favicon.ico" alt="" loading="lazy"><span class="card__target">render.com</span></span>
         </span>
         <span class="card__arrow" aria-hidden="true">&#8594;</span>
       </a>
-      <a class="card" href="https://google.com/">
+      <a class="card" href="https://render.com/tutorials/render-workflows">
         <span class="card__index" aria-hidden="true">03</span>
         <span class="card__body">
-          <span class="card__title">test link</span>
-          <span class="card__desc">Search the world&#39;s information, including webpages, images, videos and more. Google has many special features to help you find exactly what you&#39;re looking for.</span>
-          <span class="card__meta"><img class="card__icon" src="https://google.com/favicon.ico" alt="" loading="lazy"><span class="card__target">google.com</span></span>
+          <span class="card__title">Tutorial | Get started with Render Workflows</span>
+          
+          <span class="card__meta"><img class="card__icon" src="https://render.com/favicon.ico" alt="" loading="lazy"><span class="card__target">render.com/tutorials/render-workflows</span></span>
         </span>
         <span class="card__arrow" aria-hidden="true">&#8594;</span>
       </a>
