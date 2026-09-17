@@ -16,7 +16,6 @@ const model: PageModel = {
     { title: "First", url: "https://example.com/a", description: "A", iconUrl: "https://example.com/favicon.ico" },
     { title: "Second", url: "https://example.com/b", description: "", iconUrl: "" },
   ],
-  socials: [{ label: "X", url: "https://x.com/render" }],
 };
 
 describe("renderPage", () => {
@@ -56,8 +55,8 @@ describe("renderPage", () => {
     expect(html).toContain('<meta name="description" content="First half second half">');
   });
 
-  it("renders the socials block only when there are socials", () => {
-    expect(renderPage({ ...model, socials: [] })).not.toContain('class="socials"');
+  it("always renders the same icon row, whatever the model holds", () => {
+    expect(renderPage(model)).toContain('class="social__icon social__icon--github"');
   });
 
   it("declares both color schemes and no bold weight", () => {
@@ -142,11 +141,11 @@ function page(props: Record<string, unknown>, title: string): PageDTO {
 
 describe("toLinkRows / visibleRows", () => {
   const pages = [
-    page({ URL: "https://b.example", Visible: true, Kind: "Link" }, "B"),
-    page({ URL: "https://a.example", Visible: true, Kind: "Link" }, "A"),
-    page({ URL: "https://hidden.example", Visible: false, Kind: "Link" }, "Hidden"),
-    page({ URL: "https://x.com/render", Visible: true, Kind: "Social" }, "X"),
-    page({ URL: "", Visible: true, Kind: "Link" }, "No URL"),
+    page({ URL: "https://b.example", Visible: true }, "B"),
+    page({ URL: "https://a.example", Visible: true }, "A"),
+    page({ URL: "https://hidden.example", Visible: false }, "Hidden"),
+    page({ URL: "https://x.com/render", Visible: true }, "X"),
+    page({ URL: "", Visible: true }, "No URL"),
   ];
 
   it("reads the URL property, not the Notion page URL", () => {
@@ -161,10 +160,6 @@ describe("toLinkRows / visibleRows", () => {
     expect(visibleRows(toLinkRows(pages)).map((r) => r.title)).toEqual(["B", "A", "X"]);
   });
 
-  it("reads Kind as a social flag", () => {
-    const social = visibleRows(toLinkRows(pages)).find((r) => r.title === "X");
-    expect(social?.kind).toBe("social");
-  });
 });
 
 describe("groupByPerson", () => {

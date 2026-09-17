@@ -46,7 +46,6 @@ function rawPage(
   /** Only makes the Notion page id unique. */
   n: number,
   visible: boolean,
-  kind: string,
   people: string[] = [SHIFRA],
   everyone = false,
 ) {
@@ -59,7 +58,6 @@ function rawPage(
       Title: titleProp(title),
       URL: { type: "url", url },
       Visible: { type: "checkbox", checkbox: visible },
-      Kind: { type: "select", select: { name: kind } },
       Everyone: { type: "checkbox", checkbox: everyone },
       People: { type: "relation", relation: people.map((id) => ({ id })) },
     },
@@ -82,11 +80,10 @@ function rawPerson(id: string, name: string, slug: string, tagline: string) {
 
 const LINK_PAGES = [
   // Shared by both people, so it must be scraped and checked exactly once.
-  rawPage("Discord", "https://discord.com/invite/x", 1, true, "Link", [SHIFRA, ALEX]),
-  rawPage("Startups", "https://render.com/startups", 2, true, "Link"),
-  rawPage("Hidden", "https://render.com/secret", 3, false, "Link"),
-  rawPage("X", "https://x.com/render", 10, true, "Social"),
-  rawPage("Alex only", "https://example.com/alex", 4, true, "Link", [ALEX]),
+  rawPage("Discord", "https://discord.com/invite/x", 1, true, [SHIFRA, ALEX]),
+  rawPage("Startups", "https://render.com/startups", 2, true),
+  rawPage("Hidden", "https://render.com/secret", 3, false),
+  rawPage("Alex only", "https://example.com/alex", 4, true, [ALEX]),
 ];
 
 const PEOPLE_PAGES = [
@@ -264,13 +261,11 @@ describe("grouplink.rebuild", () => {
 
     expect(result.pageCount).toBe(2);
     expect(result.linkCount).toBe(3);
-    expect(result.socialCount).toBe(1);
 
     const html = h.committedHtml();
     expect(html.indexOf("Discord")).toBeLessThan(html.indexOf("Startups"));
     expect(html).not.toContain("Hidden");
     expect(html).not.toContain("render.com/secret");
-    expect(html).toContain("https://x.com/render");
   });
 
   it("puts a person's links in their own file and nobody else's", async () => {
@@ -291,7 +286,7 @@ describe("grouplink.rebuild", () => {
     const h = harness({
       links: [
         ...LINK_PAGES,
-        rawPage("Careers", "https://render.com/careers", 5, true, "Link", [], true),
+        rawPage("Careers", "https://render.com/careers", 5, true, [], true),
       ],
     });
     await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
@@ -305,7 +300,7 @@ describe("grouplink.rebuild", () => {
     const h = harness({
       links: [
         ...LINK_PAGES,
-        rawPage("Careers", "https://render.com/careers", 5, true, "Link", [], true),
+        rawPage("Careers", "https://render.com/careers", 5, true, [], true),
       ],
     });
     await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
@@ -326,26 +321,12 @@ describe("grouplink.rebuild", () => {
     expect(files["site/alex/index.html"]).not.toContain("Shifra Williams");
   });
 
-  it("puts the root person's socials on every page", async () => {
-    const h = harness({
-      links: [
-        ...LINK_PAGES,
-        rawPage("Alex social", "https://x.com/alex", 11, true, "Social", [ALEX]),
-      ],
-    });
-    await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
-    const files = h.committed();
-
-    expect(files["site/alex/index.html"]).toContain("https://x.com/render");
-    expect(files["site/alex/index.html"]).not.toContain("https://x.com/alex");
-  });
-
   it("reports why a row renders on no page", async () => {
     const h = harness({
       links: [
         ...LINK_PAGES,
-        rawPage("Orphan", "https://example.com/orphan", 20, true, "Link", []),
-        rawPage("No URL", "", 21, true, "Link"),
+        rawPage("Orphan", "https://example.com/orphan", 20, true, []),
+        rawPage("No URL", "", 21, true),
       ],
     });
     const result = await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
@@ -434,9 +415,9 @@ describe("grouplink.rebuild", () => {
   });
 
   it("reports unreachable links", async () => {
-    const h = harness({ statuses: { "https://x.com/render": 404 } });
+    const h = harness({ statuses: { "https://render.com/startups": 404 } });
     const result = await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
-    expect(result.deadLinks).toEqual(["https://x.com/render (404)"]);
+    expect(result.deadLinks).toEqual(["https://render.com/startups (404)"]);
   });
 
   it("commits every page once, deploys, and posts on a real run", async () => {
@@ -507,7 +488,7 @@ describe("grouplink.rebuild", () => {
 
   it("scrapes in batches instead of opening one run per link", async () => {
     const links = Array.from({ length: 25 }, (_, i) =>
-      rawPage(`Link ${i}`, `https://example.com/${i}`, i, true, "Link"),
+      rawPage(`Link ${i}`, `https://example.com/${i}`, i, true),
     );
     const h = harness({ links });
     const result = await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));

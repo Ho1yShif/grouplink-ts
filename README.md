@@ -103,7 +103,6 @@ There are two. Links:
 | `Title`    | title    | Card text. Not scraped — this is the copy you control.                         |
 | `URL`      | url      | Where the card points.                                                         |
 | `Visible`  | checkbox | Unchecked rows are dropped.                                                    |
-| `Kind`     | select   | `Link` renders a card. `Social` renders in the icon row, and only the root person's social rows are used. |
 | `Everyone` | checkbox | Checked puts the link on every person's page.                                  |
 | `People`   | relation | Which pages the link appears on. Relate it to two rows and it appears on both. |
 
@@ -207,11 +206,12 @@ tokens with a dark override, PP Neue Montreal for prose, square corners, 1px
 hairlines, and purple reserved for links and focus rings.
 
 The masthead is centered, with the Render wordmark above a row of social icons.
-It is the same on every page. A social row whose label is `YouTube`, `LinkedIn`, `X`, `GitHub`, or
-`Discord` gets
-the matching icon from `site/assets/icons/`; any other label renders as a mono
-wordmark. The wordmark and the icons are white files drawn as CSS masks and
-painted with the text color, so they read on both the light and dark background.
+It is the same on every page. The icons are YouTube, LinkedIn, X, GitHub, and
+Discord, and they come from `SOCIALS` in `src/render.ts` rather than from Notion,
+so editing that list is the only way to change the row. Each label needs a
+matching file in `site/assets/icons/`. The wordmark and the icons are white files
+drawn as CSS masks and painted with the text color, so they read on both the
+light and dark background.
 
 The brand woff2 files under `site/assets/fonts/` are commercial faces. If this
 repo needs to stop redistributing them, delete the four `@font-face` blocks and

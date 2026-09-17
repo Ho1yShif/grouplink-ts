@@ -7,7 +7,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { faviconUrl, pagePath } from "../src/links.js";
-import { renderPage, type LinkCard, type SocialLink } from "../src/render.js";
+import { renderPage, type LinkCard } from "../src/render.js";
 
 interface SeedPerson {
   name: string;
@@ -42,15 +42,6 @@ const PEOPLE: SeedPerson[] = [
   },
 ];
 
-// The header is the same on every page, so this list is not per person.
-const SOCIALS: SocialLink[] = [
-  { label: "YouTube", url: "https://www.youtube.com/@render-inc" },
-  { label: "LinkedIn", url: "https://www.linkedin.com/company/renderco" },
-  { label: "X", url: "https://x.com/render" },
-  { label: "GitHub", url: "https://github.com/render-oss/sdk" },
-  { label: "Discord", url: "https://render.com/discord" },
-];
-
 const DEFAULT_SLUG = "shifra";
 const TAGLINE = "The fastest path to production for full-stack applications and agents";
 
@@ -68,7 +59,6 @@ for (const person of PEOPLE) {
         iconUrl: faviconUrl(link.url),
       }),
     ),
-    socials: SOCIALS,
   });
 
   const paths = [pagePath("site", person.slug)];

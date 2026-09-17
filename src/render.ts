@@ -33,8 +33,6 @@ export interface PageModel {
   /** Metadata only. The page does not show it. */
   tagline: string;
   cards: LinkCard[];
-  /** Same list on every page, so the header does not change between people. */
-  socials: SocialLink[];
 }
 
 export function escapeHtml(value: string): string {
@@ -323,18 +321,6 @@ ${ROW_STAGGER}
 .social__icon--github { --icon: url('/assets/icons/github.svg'); }
 .social__icon--discord { --icon: url('/assets/icons/discord.svg'); }
 
-/* A label with no icon file keeps the old wordmark treatment. */
-.social--text {
-  font-family: var(--font-mono);
-  font-weight: 500;
-  font-size: 12px;
-  line-height: 24px;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: var(--link);
-}
-.social--text:hover { color: var(--link-hover); }
-
 @media (max-width: 767px) {
   .page { padding: 48px 16px 40px; gap: 32px; }
   .masthead { margin-bottom: 28px; }
@@ -428,28 +414,32 @@ function renderCard(card: LinkCard, index: number): string {
 /** Where the wordmark in the masthead links. */
 const LOGO_HREF = "https://dashboard.render.com/";
 
-/** Labels with an icon under site/assets/icons, keyed by lowercased label. */
-const SOCIAL_ICONS = new Set(["youtube", "linkedin", "x", "github", "discord"]);
+/**
+ * The masthead's icon row. It is the same on every page and does not come from
+ * Notion. Each label needs a matching file under site/assets/icons and a
+ * .social__icon--<label> rule in STYLES.
+ */
+export const SOCIALS: SocialLink[] = [
+  { label: "YouTube", url: "https://www.youtube.com/@render-inc" },
+  { label: "LinkedIn", url: "https://www.linkedin.com/company/renderco" },
+  { label: "X", url: "https://x.com/render" },
+  { label: "GitHub", url: "https://github.com/render-oss/sdk" },
+  { label: "Discord", url: "https://render.com/discord" },
+];
 
 function renderSocial(social: SocialLink): string {
   const href = escapeHtml(safeUrl(social.url));
-  const label = escapeHtml(social.label);
   const icon = social.label.trim().toLowerCase();
-  if (!SOCIAL_ICONS.has(icon)) {
-    return `        <a class="social social--text" href="${href}">${label}</a>`;
-  }
+  const label = escapeHtml(social.label);
   return `        <a class="social" href="${href}" aria-label="${label}"><span class="social__icon social__icon--${icon}"></span></a>`;
 }
 
 export function renderPage(model: PageModel): string {
   const taglineText = model.tagline.replace(/\s*\r?\n\s*/g, " ").trim();
   const cards = model.cards.map((card, i) => renderCard(card, i)).join("\n");
-  const socials = model.socials.map(renderSocial).join("\n");
-  const socialsBlock = socials
-    ? `      <nav class="socials" aria-label="Social">
-${socials}
-      </nav>`
-    : "";
+  const socialsBlock = `      <nav class="socials" aria-label="Social">
+${SOCIALS.map(renderSocial).join("\n")}
+      </nav>`;
 
   return `<!doctype html>
 <html lang="en">

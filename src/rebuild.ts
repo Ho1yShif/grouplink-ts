@@ -29,7 +29,7 @@ import {
   type PersonPage,
   type SkippedRow,
 } from "./links.js";
-import { renderPage, type LinkCard, type PageModel, type SocialLink } from "./render.js";
+import { renderPage, type LinkCard, type PageModel } from "./render.js";
 
 /** The subset of scrape.extractMetadata we cache and use. */
 interface CachedMeta {
@@ -60,8 +60,6 @@ export interface RebuildResult {
   pageCount: number;
   /** Distinct card URLs across every page. */
   linkCount: number;
-  /** Distinct social URLs across every page. */
-  socialCount: number;
   cacheHits: number;
   /** Link rows read from Notion that render on no page, and why. */
   skipped: SkippedRow[];
@@ -115,9 +113,7 @@ async function runRebuild(ctx: TaskContext, input: RebuildInput): Promise<Rebuil
 
   // A link on three pages is one URL to look up, scrape, and health-check.
   const rows = pages.flatMap((page) => page.rows);
-  const cardUrls = uniqueUrls(rows.filter((row) => row.kind === "link"));
-  const socialUrls = uniqueUrls(rows.filter((row) => row.kind === "social"));
-  const allUrls = uniqueUrls(rows);
+  const cardUrls = uniqueUrls(rows);
 
   // 2) Batched fan-out: look for each card's metadata in Key Value first.
   const metaByUrl = new Map<string, CachedMeta>();
@@ -150,10 +146,10 @@ async function runRebuild(ctx: TaskContext, input: RebuildInput): Promise<Rebuil
 
   // 5) Batched fan-out: health-check every link. tasks-http has no HEAD method,
   //    so this is a GET whose body we discard.
-  const checks = await mapInBatches(allUrls, (url) =>
+  const checks = await mapInBatches(cardUrls, (url) =>
     ctx.run(request, { method: "GET" as const, url }),
   );
-  const deadLinks = allUrls
+  const deadLinks = cardUrls
     .map((url, i) => ({ url, check: checks[i] }))
     .filter(({ check }) => unreachable(check))
     .map(({ url, check }) => `${url} (${check?.status ?? "no response"})`);
@@ -161,9 +157,8 @@ async function runRebuild(ctx: TaskContext, input: RebuildInput): Promise<Rebuil
   // 6) Render one file per person, plus a second copy of the default person's page
   //    at the site root, so `/` and `/<default slug>` serve the same thing.
   const files: SiteFile[] = [];
-  const socials = sharedSocials(pages, cfg.defaultSlug);
   for (const page of pages) {
-    const content = renderPage(toModel(page, metaByUrl, socials));
+    const content = renderPage(toModel(page, metaByUrl));
     files.push({ path: pagePath(cfg.siteDir, page.person.slug), content });
     if (page.person.slug === cfg.defaultSlug) {
       files.push({ path: pagePath(cfg.siteDir, ""), content });
@@ -173,7 +168,6 @@ async function runRebuild(ctx: TaskContext, input: RebuildInput): Promise<Rebuil
   const result: RebuildResult = {
     pageCount: pages.length,
     linkCount: cardUrls.length,
-    socialCount: socialUrls.length,
     cacheHits: cardUrls.length - missUrls.length,
     skipped,
     deadLinks,
@@ -288,29 +282,11 @@ function readCached(value: string | null | undefined): CachedMeta | null {
   return null;
 }
 
-/**
- * Every page gets the default person's social row, so the header is identical
- * across the site. A social row on someone else's page is ignored.
- */
-function sharedSocials(pages: PersonPage[], defaultSlug: string): SocialLink[] {
-  const root = pages.find((page) => page.person.slug === defaultSlug);
-  return (root?.rows ?? [])
-    .filter((row) => row.kind === "social")
-    .map((row) => ({ label: row.title, url: row.url }));
-}
-
-function toModel(
-  page: PersonPage,
-  metaByUrl: Map<string, CachedMeta>,
-  socials: SocialLink[],
-): PageModel {
+function toModel(page: PersonPage, metaByUrl: Map<string, CachedMeta>): PageModel {
   return {
     name: page.person.name,
     tagline: page.person.tagline,
-    socials,
-    cards: page.rows
-      .filter((row) => row.kind === "link")
-      .map((row): LinkCard => toCard(row, metaByUrl.get(row.url))),
+    cards: page.rows.map((row): LinkCard => toCard(row, metaByUrl.get(row.url))),
   };
 }
 

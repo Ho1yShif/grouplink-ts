@@ -1,13 +1,10 @@
 // Notion rows in, page model out. Pure functions — no network, no ctx.
 import type { PageDTO } from "@render-lab/tasks-notion";
 
-export type LinkKind = "link" | "social";
-
 export interface LinkRow {
   title: string;
   url: string;
   visible: boolean;
-  kind: LinkKind;
   /** Renders on every person's page, whatever `personIds` holds. */
   everyone: boolean;
   /** Notion page ids of the People rows this link belongs to. */
@@ -47,12 +44,11 @@ export function toLinkRows(pages: PageDTO[]): LinkRow[] {
     if (!url || !title) continue;
 
     const visible = props["Visible"] !== false;
-    const kind = readString(props["Kind"]).toLowerCase() === "social" ? "social" : "link";
     const everyone = props["Everyone"] === true;
     const related = props["People"];
     const personIds = Array.isArray(related) ? related : [];
 
-    rows.push({ title, url, visible, kind, everyone, personIds });
+    rows.push({ title, url, visible, everyone, personIds });
   }
 
   return rows;
