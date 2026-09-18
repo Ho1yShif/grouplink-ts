@@ -37,9 +37,7 @@ const pages = groupByPerson(visibleRows(toLinkRows(linkPages)), people);
 const cardUrls = uniqueUrls(pages.flatMap((page) => page.rows));
 
 const scraped = await mapInBatches(cardUrls, (url) => ctx.run(extractPageMetadata, { url }));
-const descriptions = new Map(
-  cardUrls.map((url, i) => [url, cardDescription(scraped[i] ?? {})]),
-);
+const descriptions = new Map(cardUrls.map((url, i) => [url, cardDescription(scraped[i] ?? {})]));
 
 for (const page of pages) {
   writePages(

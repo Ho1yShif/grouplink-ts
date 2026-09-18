@@ -56,12 +56,7 @@ function rawPage(
   url: string,
   /** Only makes the Notion page id unique. */
   n: number,
-  {
-    visible = true,
-    people = [SHIFRA],
-    everyone = false,
-    icon = null,
-  }: RawPageOptions = {},
+  { visible = true, people = [SHIFRA], everyone = false, icon = null }: RawPageOptions = {},
 ) {
   return {
     id: `p-${n}`,
@@ -419,9 +414,7 @@ describe("grouplink.rebuild", () => {
   it("refuses to run when SITE_DEFAULT_SLUG matches nobody", async () => {
     const h = harness();
     await expect(
-      withEnv({ DRY_RUN: "false", SITE_DEFAULT_SLUG: "nobody" }, () =>
-        rebuild.func(h.ctx, {}),
-      ),
+      withEnv({ DRY_RUN: "false", SITE_DEFAULT_SLUG: "nobody" }, () => rebuild.func(h.ctx, {})),
     ).rejects.toThrow(/matches no Slug/);
   });
 
@@ -572,9 +565,7 @@ describe("grouplink.rebuild", () => {
   it("posts the failure to Slack before it rethrows", async () => {
     const h = harness();
     await expect(
-      withEnv({ DRY_RUN: "false", SITE_DEFAULT_SLUG: "nobody" }, () =>
-        rebuild.func(h.ctx, {}),
-      ),
+      withEnv({ DRY_RUN: "false", SITE_DEFAULT_SLUG: "nobody" }, () => rebuild.func(h.ctx, {})),
     ).rejects.toThrow(/matches no Slug/);
 
     expect(h.slackPost).toHaveBeenCalledTimes(1);

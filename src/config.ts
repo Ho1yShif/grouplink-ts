@@ -74,9 +74,7 @@ export function loadConfig(
 
   const peopleDatabaseId = input.peopleDatabaseId ?? env.NOTION_PEOPLE_DATABASE_ID ?? "";
   if (!peopleDatabaseId) {
-    throw new Error(
-      "set NOTION_PEOPLE_DATABASE_ID, or pass peopleDatabaseId in the run input",
-    );
+    throw new Error("set NOTION_PEOPLE_DATABASE_ID, or pass peopleDatabaseId in the run input");
   }
 
   // Required, because an unset value would silently publish a site with no root page.

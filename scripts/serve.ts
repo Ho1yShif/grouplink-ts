@@ -61,10 +61,7 @@ function allowReloadClient(html: string): string {
 }
 
 function injectReloadClient(html: string): string {
-  return allowReloadClient(html).replace(
-    "</body>",
-    `<script>${RELOAD_SCRIPT}</script>\n</body>`,
-  );
+  return allowReloadClient(html).replace("</body>", `<script>${RELOAD_SCRIPT}</script>\n</body>`);
 }
 
 /** Resolve a URL path to a file inside site/, or null if it escapes or is missing. */

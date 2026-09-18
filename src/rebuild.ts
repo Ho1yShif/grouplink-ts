@@ -203,18 +203,14 @@ async function resolveMetadata(
   cfg: RebuildConfig,
 ): Promise<{ metaByUrl: Map<string, CachedMeta>; cacheHits: number }> {
   const metaByUrl = new Map<string, CachedMeta>();
-  const cached = await mapInBatches(cardUrls, (url) =>
-    ctx.run(kvGet, { key: metaCacheKey(url) }),
-  );
+  const cached = await mapInBatches(cardUrls, (url) => ctx.run(kvGet, { key: metaCacheKey(url) }));
   cardUrls.forEach((url, i) => {
     const hit = readCached(cached[i]?.value);
     if (hit) metaByUrl.set(url, hit);
   });
 
   const missUrls = cardUrls.filter((url) => !metaByUrl.has(url));
-  const scraped = await mapInBatches(missUrls, (url) =>
-    ctx.run(extractPageMetadata, { url }),
-  );
+  const scraped = await mapInBatches(missUrls, (url) => ctx.run(extractPageMetadata, { url }));
   const scrapedMeta = missUrls.map(
     (_url, i): CachedMeta => ({ description: cardDescription(scraped[i] ?? {}) }),
   );

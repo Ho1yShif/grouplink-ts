@@ -7,7 +7,13 @@ const model: PageModel = {
   name: "Render",
   tagline: "Cloud application hosting for developers.",
   cards: [
-    { title: "First", url: "https://example.com/a", description: "A", iconUrl: "https://example.com/favicon.ico", icon: "workflows" },
+    {
+      title: "First",
+      url: "https://example.com/a",
+      description: "A",
+      iconUrl: "https://example.com/favicon.ico",
+      icon: "workflows",
+    },
     { title: "Second", url: "https://example.com/b", description: "", iconUrl: "", icon: "arrow" },
   ],
 };
@@ -27,7 +33,15 @@ describe("renderPage", () => {
   it("escapes titles and descriptions", () => {
     const html = renderPage({
       ...model,
-      cards: [{ title: '<script>alert(1)</script>', url: "https://example.com", description: 'a "b" & c', iconUrl: "", icon: "arrow" }],
+      cards: [
+        {
+          title: "<script>alert(1)</script>",
+          url: "https://example.com",
+          description: 'a "b" & c',
+          iconUrl: "",
+          icon: "arrow",
+        },
+      ],
     });
     expect(html).not.toContain("<script>alert(1)</script>");
     expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
@@ -37,7 +51,9 @@ describe("renderPage", () => {
   it("drops a javascript: href", () => {
     const html = renderPage({
       ...model,
-      cards: [{ title: "Bad", url: "javascript:alert(1)", description: "", iconUrl: "", icon: "arrow" }],
+      cards: [
+        { title: "Bad", url: "javascript:alert(1)", description: "", iconUrl: "", icon: "arrow" },
+      ],
     });
     expect(html).not.toContain("javascript:");
     expect(html).toContain('href="#"');
@@ -64,7 +80,9 @@ describe("renderPage", () => {
   it("declares a mask rule for every icon in the library", () => {
     const html = renderPage(model);
     for (const name of ICON_NAMES) {
-      expect(html).toContain(`.card__mark--${name} { --mark: url('/assets/link-icons/${name}.png'); }`);
+      expect(html).toContain(
+        `.card__mark--${name} { --mark: url('/assets/link-icons/${name}.png'); }`,
+      );
     }
   });
 

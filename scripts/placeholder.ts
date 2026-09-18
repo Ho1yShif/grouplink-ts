@@ -38,10 +38,7 @@ const PEOPLE: SeedPerson[] = [
   {
     name: "Graham",
     slug: "graham",
-    links: [
-      ...SHARED,
-      { title: "Docs", url: "https://render.com/docs", icon: "info" },
-    ],
+    links: [...SHARED, { title: "Docs", url: "https://render.com/docs", icon: "info" }],
   },
 ];
 

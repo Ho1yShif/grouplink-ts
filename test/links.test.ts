@@ -83,11 +83,7 @@ describe("groupByPerson", () => {
   });
 
   it("counts a row that is both Everyone and related once", () => {
-    expect(titlesFor("shifra")).toEqual([
-      "Shifra only",
-      "Everyone",
-      "Everyone and related",
-    ]);
+    expect(titlesFor("shifra")).toEqual(["Shifra only", "Everyone", "Everyone and related"]);
   });
 
   it("renders a row related to nobody nowhere", () => {
@@ -124,7 +120,9 @@ describe("unknownIcons", () => {
 });
 
 describe("skippedRows", () => {
-  const people: PersonRow[] = [{ id: "person-shifra", name: "Shifra", slug: "shifra", tagline: "" }];
+  const people: PersonRow[] = [
+    { id: "person-shifra", name: "Shifra", slug: "shifra", tagline: "" },
+  ];
 
   it("names the check each row failed", () => {
     const skipped = skippedRows(
