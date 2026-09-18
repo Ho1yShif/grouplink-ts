@@ -1,5 +1,5 @@
 // Tier 2: live integration test. Opt-in only — gated behind RUN_LIVE=1 and real
-// secrets, run via `pnpm test:live`. Never gates `pnpm test` (ADR-0010).
+// secrets, run via `pnpm test:live`. Never gates `pnpm test`.
 //
 // Requires every variable in REQUIRED below. Runs in dry-run, so it reads Notion,
 // scrapes, caches, and health-checks without committing or deploying anything.
