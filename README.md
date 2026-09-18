@@ -214,10 +214,12 @@ GitHub, so don't set it there.
 
 ## The page
 
-`src/render.ts` is one function returning the whole document — no framework, no
-build step, inline CSS. It follows Render's brand foundations: semantic color
-tokens with a dark override, PP Neue Montreal for prose, square corners, 1px
-hairlines, and purple reserved for links and focus rings.
+`src/render.ts` is one function returning the whole document — no framework and
+no build step. The CSS and the one inline script live in `src/styles.ts`, which
+`render.ts` inlines and allows in the page's Content-Security-Policy by hash.
+The page follows Render's brand foundations: semantic color tokens with a dark
+override, PP Neue Montreal for prose, square corners, 1px hairlines, and purple
+reserved for links and focus rings.
 
 The masthead is centered, with the Render wordmark above a row of social icons.
 It is the same on every page. The icons are YouTube, LinkedIn, X, GitHub, and
@@ -228,7 +230,7 @@ drawn as CSS masks and painted with the text color, so they read on both the
 light and dark background.
 
 The brand woff2 files under `site/assets/fonts/` are commercial faces. If this
-repo needs to stop redistributing them, delete the four `@font-face` blocks and
+repo needs to stop redistributing them, delete the three `@font-face` blocks and
 load Manrope and Roboto Mono instead — the fallback chain already names them.
 
 Assets are referenced from the site root (`/assets/…`) so they resolve the same
@@ -236,7 +238,7 @@ from `/` and from `/<slug>/`.
 
 ## Deploy
 
-![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Ho1yShif/grouplink)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Ho1yShif/grouplink)
 
 Blueprints don't support Workflows yet, so the Workflow service is created in the
 Dashboard and everything else comes from [`render.yaml`](render.yaml).
