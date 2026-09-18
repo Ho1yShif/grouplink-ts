@@ -3,9 +3,10 @@
 //
 // Every `await ctx.run(...)` below is a separate durable run on its own instance,
 // with that package's retry policy, tracked in the dashboard. The per-URL stages fan
-// out through mapInBatches, so the run opens at most BATCH_SIZE of them at a time.
+// out through mapInBatches, so the run opens at most batch.ts's BATCH_SIZE at a time.
+// Each numbered step below has a helper of the same name further down the file.
 import { task, type TaskContext } from "@renderinc/sdk/workflows";
-import { queryDatabase } from "@render-lab/tasks-notion";
+import { queryDatabase, type PageDTO } from "@render-lab/tasks-notion";
 import { extractPageMetadata } from "@render-lab/tasks-scrape";
 import { get as kvGet, set as kvSet } from "@render-lab/tasks-render-kv";
 import { request } from "@render-lab/tasks-http";
@@ -13,25 +14,27 @@ import { commitFiles, getFileContents, listTree } from "@render-lab/tasks-github
 import { triggerDeploy, awaitDeploy } from "@render-lab/tasks-render";
 import { postMessage } from "@render-lab/tasks-slack";
 
+import { mapInBatches } from "./batch.js";
 import { assertWritable, loadConfig, type RebuildConfig, type RebuildInput } from "./config.js";
 import { DEFAULT_ICON } from "./icons.js";
 import {
+  assertDefaultSlug,
   cardDescription,
-  faviconUrl,
   groupByPerson,
   skippedRows,
   metaCacheKey,
-  pagePath,
+  pagePathsFor,
+  toCard,
   toLinkRows,
   toPersonRows,
   uniqueUrls,
   unknownIcons,
   visibleRows,
-  type LinkRow,
   type PersonPage,
+  type PersonRow,
   type SkippedRow,
 } from "./links.js";
-import { renderPage, type LinkCard, type PageModel } from "./render.js";
+import { renderPage, type PageModel } from "./render.js";
 
 /** The subset of scrape.extractMetadata we cache and use. */
 interface CachedMeta {
@@ -39,12 +42,6 @@ interface CachedMeta {
 }
 
 const EMPTY_META: CachedMeta = { description: "" };
-
-/**
- * Fan-out width for the per-URL stages. Without it a 100-row database opens 100
- * concurrent runs per stage and hits every linked site at once.
- */
-const BATCH_SIZE = 10;
 
 /**
  * Statuses that mean the URL resolved but refused an unadorned GET. X answers 403 and
@@ -81,8 +78,8 @@ export const rebuild = task(
     try {
       return await runRebuild(ctx, input);
     } catch (error) {
-      // The cron job only dispatches the run, so a failure would otherwise show up
-      // nowhere but the dashboard.
+      // The webhook receiver only dispatches the run, so a failure would otherwise
+      // show up nowhere but the dashboard.
       await reportFailure(ctx, error);
       throw error;
     }
@@ -100,82 +97,28 @@ async function runRebuild(ctx: TaskContext, input: RebuildInput): Promise<Rebuil
   ]);
 
   const people = toPersonRows(peoplePages);
-  if (!people.some((person) => person.slug === cfg.defaultSlug)) {
-    throw new Error(
-      `SITE_DEFAULT_SLUG is "${cfg.defaultSlug}", which matches no Slug in the People database`,
-    );
-  }
+  assertDefaultSlug(people, cfg.defaultSlug);
   const pages = groupByPerson(visibleRows(toLinkRows(linkPages)), people);
 
-  // A row you added in Notion that never reaches a page is otherwise invisible.
-  const skipped = skippedRows(linkPages, people);
-  for (const row of skipped) {
-    console.log(`skipped "${row.title}": ${row.reason}`);
-  }
-
-  // An Icon option with no matching file renders the default and is otherwise silent.
-  for (const name of unknownIcons(linkPages)) {
-    console.log(`unknown Icon "${name}", using ${DEFAULT_ICON}`);
-  }
+  const skipped = reportNotionProblems(linkPages, people);
 
   // A link on three pages is one URL to look up, scrape, and health-check.
-  const rows = pages.flatMap((page) => page.rows);
-  const cardUrls = uniqueUrls(rows);
+  const cardUrls = uniqueUrls(pages.flatMap((page) => page.rows));
 
-  // 2) Batched fan-out: look for each card's metadata in Key Value first.
-  const metaByUrl = new Map<string, CachedMeta>();
-  const cached = await mapInBatches(cardUrls, (url) =>
-    ctx.run(kvGet, { key: metaCacheKey(url) }),
-  );
-  cardUrls.forEach((url, i) => {
-    const hit = readCached(cached[i]?.value);
-    if (hit) metaByUrl.set(url, hit);
-  });
+  // 2) Batched fan-out: read the cache, scrape the misses, write them back.
+  const { metaByUrl, cacheHits } = await resolveMetadata(ctx, cardUrls, cfg);
 
-  // 3) Batched fan-out: scrape only the misses.
-  const missUrls = cardUrls.filter((url) => !metaByUrl.has(url));
-  const scraped = await mapInBatches(missUrls, (url) =>
-    ctx.run(extractPageMetadata, { url }),
-  );
-  const scrapedMeta = missUrls.map(
-    (_url, i): CachedMeta => ({ description: cardDescription(scraped[i] ?? {}) }),
-  );
-  missUrls.forEach((url, i) => metaByUrl.set(url, scrapedMeta[i] ?? EMPTY_META));
+  // 3) Batched fan-out: health-check every link.
+  const deadLinks = await findDeadLinks(ctx, cardUrls);
 
-  // 4) Batched fan-out: write the fresh metadata back with a TTL.
-  await mapInBatches(missUrls, (url, i) =>
-    ctx.run(kvSet, {
-      key: metaCacheKey(url),
-      value: JSON.stringify(scrapedMeta[i] ?? EMPTY_META),
-      ttlSeconds: cfg.cacheTtlSeconds,
-    }),
-  );
-
-  // 5) Batched fan-out: health-check every link. tasks-http has no HEAD method,
-  //    so this is a GET whose body we discard.
-  const checks = await mapInBatches(cardUrls, (url) =>
-    ctx.run(request, { method: "GET" as const, url }),
-  );
-  const deadLinks = cardUrls
-    .map((url, i) => ({ url, check: checks[i] }))
-    .filter(({ check }) => unreachable(check))
-    .map(({ url, check }) => `${url} (${check?.status ?? "no response"})`);
-
-  // 6) Render one file per person, plus a second copy of the default person's page
-  //    at the site root, so `/` and `/<default slug>` serve the same thing.
-  const files: SiteFile[] = [];
-  for (const page of pages) {
-    const content = renderPage(toModel(page, metaByUrl));
-    files.push({ path: pagePath(cfg.siteDir, page.person.slug), content });
-    if (page.person.slug === cfg.defaultSlug) {
-      files.push({ path: pagePath(cfg.siteDir, ""), content });
-    }
-  }
+  // 4) Render one file per person, plus a second copy of the default person's page
+  //    at the site root.
+  const files = renderFiles(pages, metaByUrl, cfg);
 
   const result: RebuildResult = {
     pageCount: pages.length,
     linkCount: cardUrls.length,
-    cacheHits: cardUrls.length - missUrls.length,
+    cacheHits,
     skipped,
     deadLinks,
     committed: false,
@@ -190,23 +133,9 @@ async function runRebuild(ctx: TaskContext, input: RebuildInput): Promise<Rebuil
   if (cfg.dryRun) return result;
   assertWritable(cfg);
 
-  // 7) Chained run, then a batched fan-out: compare each page against what the branch
-  //    already holds, so a quiet day produces no commit and no deploy. listTree
-  //    comes first because getFileContents throws a 404 on a path that doesn't
-  //    exist yet, and a new person's page never does.
-  const repo = `${cfg.repoOwner}/${cfg.repoName}`;
-  const tree = await ctx.run(listTree, { repo, ref: cfg.branch });
-  const onBranch = new Set(tree.paths);
-  const existing = files.filter((file) => onBranch.has(file.path));
-  const currents = await mapInBatches(existing, (file) =>
-    ctx.run(getFileContents, { repo, path: file.path, ref: cfg.branch }),
-  );
-  const currentByPath = new Map(existing.map((file, i) => [file.path, currents[i]?.content ?? ""]));
-
-  const changed = files.filter((file) => {
-    const current = currentByPath.get(file.path);
-    return current === undefined || current !== file.content;
-  });
+  // 5) Chained run, then a batched fan-out: compare each page against what the
+  //    branch already holds, so a quiet day produces no commit and no deploy.
+  const changed = await changedFiles(ctx, files, cfg);
   result.changedPaths = changed.map((file) => file.path);
 
   if (changed.length === 0) {
@@ -217,7 +146,7 @@ async function runRebuild(ctx: TaskContext, input: RebuildInput): Promise<Rebuil
     return result;
   }
 
-  // 8) Chained run: every changed page in one commit, so one deploy covers them all.
+  // 6) Chained run: every changed page in one commit, so one deploy covers them all.
   const commit = await ctx.run(commitFiles, {
     owner: cfg.repoOwner,
     repo: cfg.repoName,
@@ -228,7 +157,7 @@ async function runRebuild(ctx: TaskContext, input: RebuildInput): Promise<Rebuil
   result.committed = true;
   result.commitSha = commit.commitSha;
 
-  // 9) Chained runs: deploy the static site and wait for it to go live.
+  // 7) Chained runs: deploy the static site and wait for it to go live.
   const deploy = await ctx.run(triggerDeploy, {
     serviceId: cfg.staticSiteId,
     commitId: commit.commitSha,
@@ -239,13 +168,118 @@ async function runRebuild(ctx: TaskContext, input: RebuildInput): Promise<Rebuil
     deployId: deploy.deployId,
   });
 
-  // 10) Chained run: post the outcome.
+  // 8) Chained run: post the outcome.
   await notify(
     ctx,
     `grouplink is live with ${cardUrls.length} links across ${pages.length} pages. ${cfg.siteUrl}`,
     deadLinks,
   );
   return result;
+}
+
+/**
+ * Logs what a person can see in Notion but the site does not show: a row that
+ * reaches no page, and an Icon option no file matches. Both are otherwise silent.
+ * Returns the skipped rows, which the run reports as part of its result.
+ */
+function reportNotionProblems(linkPages: PageDTO[], people: PersonRow[]): SkippedRow[] {
+  const skipped = skippedRows(linkPages, people);
+  for (const row of skipped) {
+    console.log(`skipped "${row.title}": ${row.reason}`);
+  }
+  for (const name of unknownIcons(linkPages)) {
+    console.log(`unknown Icon "${name}", using ${DEFAULT_ICON}`);
+  }
+  return skipped;
+}
+
+/**
+ * Each URL's metadata, from Key Value where it is cached and from the scrape
+ * where it is not. Fresh scrapes are written back with a TTL.
+ */
+async function resolveMetadata(
+  ctx: TaskContext,
+  cardUrls: string[],
+  cfg: RebuildConfig,
+): Promise<{ metaByUrl: Map<string, CachedMeta>; cacheHits: number }> {
+  const metaByUrl = new Map<string, CachedMeta>();
+  const cached = await mapInBatches(cardUrls, (url) =>
+    ctx.run(kvGet, { key: metaCacheKey(url) }),
+  );
+  cardUrls.forEach((url, i) => {
+    const hit = readCached(cached[i]?.value);
+    if (hit) metaByUrl.set(url, hit);
+  });
+
+  const missUrls = cardUrls.filter((url) => !metaByUrl.has(url));
+  const scraped = await mapInBatches(missUrls, (url) =>
+    ctx.run(extractPageMetadata, { url }),
+  );
+  const scrapedMeta = missUrls.map(
+    (_url, i): CachedMeta => ({ description: cardDescription(scraped[i] ?? {}) }),
+  );
+  missUrls.forEach((url, i) => metaByUrl.set(url, scrapedMeta[i] ?? EMPTY_META));
+
+  await mapInBatches(missUrls, (url, i) =>
+    ctx.run(kvSet, {
+      key: metaCacheKey(url),
+      value: JSON.stringify(scrapedMeta[i] ?? EMPTY_META),
+      ttlSeconds: cfg.cacheTtlSeconds,
+    }),
+  );
+
+  return { metaByUrl, cacheHits: cardUrls.length - missUrls.length };
+}
+
+/**
+ * Every URL that did not answer, with the status it gave. tasks-http has no HEAD
+ * method, so this is a GET whose body we discard.
+ */
+async function findDeadLinks(ctx: TaskContext, cardUrls: string[]): Promise<string[]> {
+  const checks = await mapInBatches(cardUrls, (url) =>
+    ctx.run(request, { method: "GET" as const, url }),
+  );
+  return cardUrls
+    .map((url, i) => ({ url, check: checks[i] }))
+    .filter(({ check }) => unreachable(check))
+    .map(({ url, check }) => `${url} (${check?.status ?? "no response"})`);
+}
+
+/** One file per person, plus the default person's page again at the site root. */
+function renderFiles(
+  pages: PersonPage[],
+  metaByUrl: Map<string, CachedMeta>,
+  cfg: RebuildConfig,
+): SiteFile[] {
+  return pages.flatMap((page) => {
+    const content = renderPage(toModel(page, metaByUrl));
+    return pagePathsFor(cfg.siteDir, page.person.slug, cfg.defaultSlug).map((path) => ({
+      path,
+      content,
+    }));
+  });
+}
+
+/**
+ * The files whose content differs from the branch. listTree comes first because
+ * getFileContents throws a 404 on a path that doesn't exist yet, and a new
+ * person's page never does.
+ */
+async function changedFiles(
+  ctx: TaskContext,
+  files: SiteFile[],
+  cfg: RebuildConfig,
+): Promise<SiteFile[]> {
+  const repo = `${cfg.repoOwner}/${cfg.repoName}`;
+  const tree = await ctx.run(listTree, { repo, ref: cfg.branch });
+  const onBranch = new Set(tree.paths);
+  const existing = files.filter((file) => onBranch.has(file.path));
+  const currents = await mapInBatches(existing, (file) =>
+    ctx.run(getFileContents, { repo, path: file.path, ref: cfg.branch }),
+  );
+  const currentByPath = new Map(existing.map((file, i) => [file.path, currents[i]?.content ?? ""]));
+
+  return files.filter((file) => currentByPath.get(file.path) !== file.content);
 }
 
 /** Never masks the error it is reporting: a failed Slack post is logged and dropped. */
@@ -256,19 +290,6 @@ async function reportFailure(ctx: TaskContext, error: unknown): Promise<void> {
   } catch (postError) {
     console.error("could not post the failure to Slack", postError);
   }
-}
-
-/** Promise.all in fixed-size batches, in input order. */
-async function mapInBatches<T, R>(
-  items: T[],
-  fn: (item: T, index: number) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = [];
-  for (let start = 0; start < items.length; start += BATCH_SIZE) {
-    const batch = items.slice(start, start + BATCH_SIZE);
-    results.push(...(await Promise.all(batch.map((item, i) => fn(item, start + i)))));
-  }
-  return results;
 }
 
 function unreachable(check: { ok: boolean; status: number } | undefined): boolean {
@@ -293,17 +314,7 @@ function toModel(page: PersonPage, metaByUrl: Map<string, CachedMeta>): PageMode
   return {
     name: page.person.name,
     tagline: page.person.tagline,
-    cards: page.rows.map((row): LinkCard => toCard(row, metaByUrl.get(row.url))),
-  };
-}
-
-function toCard(row: LinkRow, meta: CachedMeta | undefined): LinkCard {
-  return {
-    title: row.title,
-    url: row.url,
-    description: meta?.description ?? "",
-    iconUrl: faviconUrl(row.url),
-    icon: row.icon,
+    cards: page.rows.map((row) => toCard(row, metaByUrl.get(row.url)?.description ?? "")),
   };
 }
 
