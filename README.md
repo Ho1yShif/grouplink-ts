@@ -428,13 +428,17 @@ curl -X POST https://grouplink-webhook.onrender.com/tasks/grouplink.rebuild \
   -d '[{"dryRun":true}]'
 ```
 
-## Tests
+## Checks
 
 - `pnpm test` — Tier 1. Hermetic: the composition test drives the real
   `grouplink.rebuild`, routing every chained run to the owning package's `*Impl`
   with a fake at the vendor port. No network, no secrets.
 - `pnpm test:live` — Tier 2. Hits real Notion, real sites, and a real
   Key Value instance in dry-run.
+- `pnpm typecheck` — types across `src`, `test`, and `scripts`. `pnpm build`
+  reads `tsconfig.build.json`, which emits `src` alone.
+- `pnpm lint` — Biome's lint rules and formatting. `pnpm format` writes the
+  fixes.
 
 ## Where the tasks come from
 
