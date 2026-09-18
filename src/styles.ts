@@ -93,7 +93,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: var(--font-default);
+  font-family: var(--font-brand);
   font-weight: 400;
   font-size: 16px;
   line-height: 24px;
