@@ -10,9 +10,9 @@
     "start": "node dist/main.js",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
+    "test:live": "RUN_LIVE=1 vitest run test/rebuild.live.test.ts",
     "lint": "biome check .",
     "format": "biome check --write .",
-    "test:live": "RUN_LIVE=1 vitest run test/rebuild.live.test.ts",
     "placeholder": "tsx scripts/placeholder.ts",
     "preview": "tsx --env-file=.env scripts/preview.ts",
     "serve": "tsx --watch scripts/serve.ts"
