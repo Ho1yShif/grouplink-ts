@@ -102,7 +102,7 @@ body {
 }
 
 .page {
-  max-width: 560px;
+  max-width: 640px;
   margin: 0 auto;
   padding: 96px 32px 64px;
   display: flex;
