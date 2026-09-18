@@ -5,28 +5,23 @@
 // This is the read half of grouplink.rebuild: Notion and the scrape, no Key Value,
 // no GitHub, no deploy. It overwrites the tracked files under site/ — `git checkout
 // -- site && git clean -fd site` puts them back.
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { localCtx } from "@render-lab/test-utils";
 import { queryDatabase } from "@render-lab/tasks-notion";
 import { extractPageMetadata } from "@render-lab/tasks-scrape";
+import { mapInBatches } from "../src/batch.js";
 import { loadConfig } from "../src/config.js";
 import {
+  assertDefaultSlug,
   cardDescription,
-  faviconUrl,
   groupByPerson,
-  pagePath,
+  toCard,
   toLinkRows,
   toPersonRows,
   uniqueUrls,
   visibleRows,
 } from "../src/links.js";
-import { renderPage, type LinkCard } from "../src/render.js";
+import { writePages } from "./write-pages.js";
 
-const BATCH_SIZE = 10;
-
-const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const ctx = localCtx();
 const cfg = loadConfig({ dryRun: true });
 
@@ -36,46 +31,23 @@ const [linkPages, peoplePages] = await Promise.all([
 ]);
 
 const people = toPersonRows(peoplePages);
-if (!people.some((person) => person.slug === cfg.defaultSlug)) {
-  throw new Error(
-    `SITE_DEFAULT_SLUG is "${cfg.defaultSlug}", which matches no Slug in People`,
-  );
-}
+assertDefaultSlug(people, cfg.defaultSlug);
 
 const pages = groupByPerson(visibleRows(toLinkRows(linkPages)), people);
-const rows = pages.flatMap((page) => page.rows);
-const cardUrls = uniqueUrls(rows);
+const cardUrls = uniqueUrls(pages.flatMap((page) => page.rows));
 
-const descriptions = new Map<string, string>();
-for (let start = 0; start < cardUrls.length; start += BATCH_SIZE) {
-  const batch = cardUrls.slice(start, start + BATCH_SIZE);
-  const scraped = await Promise.all(
-    batch.map((url) => ctx.run(extractPageMetadata, { url })),
-  );
-  batch.forEach((url, i) => descriptions.set(url, cardDescription(scraped[i] ?? {})));
-}
+const scraped = await mapInBatches(cardUrls, (url) => ctx.run(extractPageMetadata, { url }));
+const descriptions = new Map(
+  cardUrls.map((url, i) => [url, cardDescription(scraped[i] ?? {})]),
+);
 
 for (const page of pages) {
-  const html = renderPage({
-    name: page.person.name,
-    tagline: page.person.tagline,
-    cards: page.rows.map(
-      (row): LinkCard => ({
-        title: row.title,
-        url: row.url,
-        description: descriptions.get(row.url) ?? "",
-        iconUrl: faviconUrl(row.url),
-        icon: row.icon,
-      }),
-    ),
-  });
-
-  const paths = [pagePath(cfg.siteDir, page.person.slug)];
-  if (page.person.slug === cfg.defaultSlug) paths.push(pagePath(cfg.siteDir, ""));
-  for (const path of paths) {
-    const out = resolve(repoRoot, path);
-    mkdirSync(dirname(out), { recursive: true });
-    writeFileSync(out, html);
-    console.log(`wrote ${path}`);
-  }
+  writePages(
+    {
+      name: page.person.name,
+      tagline: page.person.tagline,
+      cards: page.rows.map((row) => toCard(row, descriptions.get(row.url) ?? "")),
+    },
+    { siteDir: cfg.siteDir, slug: page.person.slug, defaultSlug: cfg.defaultSlug },
+  );
 }

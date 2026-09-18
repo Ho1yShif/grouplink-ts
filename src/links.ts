@@ -159,7 +159,7 @@ export function uniqueUrls(rows: LinkRow[]): string[] {
 }
 
 /** The default person is the root page; everyone else lives under their slug. */
-export function pagePath(siteDir: string, slug: string): string {
+function pagePath(siteDir: string, slug: string): string {
   return slug ? `${siteDir}/${slug}/index.html` : `${siteDir}/index.html`;
 }
 

@@ -17,8 +17,9 @@ import { readFile, stat } from "node:fs/promises";
 import { createServer, type ServerResponse } from "node:http";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { envInt } from "../src/config.js";
 
-const PORT = Number.parseInt(process.env.PORT ?? "3000", 10);
+const PORT = envInt(process.env.PORT, 3000);
 const DEBOUNCE_MS = 100;
 const RELOAD_PATH = "/__reload";
 
