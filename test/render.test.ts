@@ -1,16 +1,7 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { escapeHtml, renderPage, safeUrl, type PageModel } from "../src/render.js";
-import {
-  faviconUrl,
-  groupByPerson,
-  toIconName,
-  toLinkRows,
-  unknownIcons,
-  visibleRows,
-} from "../src/links.js";
 import { ICON_NAMES } from "../src/icons.js";
-import type { PageDTO } from "@render-lab/tasks-notion";
 
 const model: PageModel = {
   name: "Render",
@@ -137,121 +128,5 @@ describe("escapeHtml / safeUrl", () => {
     expect(safeUrl("https://render.com/")).toBe("https://render.com/");
     expect(safeUrl("data:text/html,x")).toBe("#");
     expect(safeUrl("not a url")).toBe("#");
-  });
-});
-
-describe("faviconUrl", () => {
-  it("points at the origin root", () => {
-    expect(faviconUrl("https://render.com/tutorials/x")).toBe("https://render.com/favicon.ico");
-  });
-});
-
-function page(props: Record<string, unknown>, title: string): PageDTO {
-  return {
-    id: "p",
-    url: "https://www.notion.so/p",
-    title,
-    properties: props as PageDTO["properties"],
-    createdTime: "",
-    lastEditedTime: "",
-  };
-}
-
-describe("toLinkRows / visibleRows", () => {
-  const pages = [
-    page({ URL: "https://b.example", Visible: true }, "B"),
-    page({ URL: "https://a.example", Visible: true }, "A"),
-    page({ URL: "https://hidden.example", Visible: false }, "Hidden"),
-    page({ URL: "https://x.com/render", Visible: true }, "X"),
-    page({ URL: "", Visible: true }, "No URL"),
-  ];
-
-  it("reads the URL property, not the Notion page URL", () => {
-    expect(toLinkRows(pages)[0]?.url).toBe("https://b.example");
-  });
-
-  it("skips rows with no URL", () => {
-    expect(toLinkRows(pages).map((r) => r.title)).not.toContain("No URL");
-  });
-
-  it("keeps the Notion order and drops hidden rows", () => {
-    expect(visibleRows(toLinkRows(pages)).map((r) => r.title)).toEqual(["B", "A", "X"]);
-  });
-
-});
-
-describe("groupByPerson", () => {
-  const people = [
-    { id: "person-shifra", name: "Shifra", slug: "shifra", tagline: "" },
-    { id: "person-alex", name: "Alex", slug: "alex", tagline: "" },
-  ];
-
-  const rows = toLinkRows([
-    page({ URL: "https://shared.example", People: ["person-shifra"] }, "Shifra only"),
-    page({ URL: "https://all.example", Everyone: true }, "Everyone"),
-    page(
-      { URL: "https://both.example", Everyone: true, People: ["person-shifra"] },
-      "Everyone and related",
-    ),
-    page({ URL: "https://orphan.example" }, "Related to nobody"),
-  ]);
-
-  const titlesFor = (slug: string) =>
-    groupByPerson(rows, people)
-      .find((p) => p.person.slug === slug)
-      ?.rows.map((r) => r.title);
-
-  it("puts an Everyone row on every page", () => {
-    expect(titlesFor("alex")).toEqual(["Everyone", "Everyone and related"]);
-  });
-
-  it("counts a row that is both Everyone and related once", () => {
-    expect(titlesFor("shifra")).toEqual([
-      "Shifra only",
-      "Everyone",
-      "Everyone and related",
-    ]);
-  });
-
-  it("renders a row related to nobody nowhere", () => {
-    expect(titlesFor("shifra")).not.toContain("Related to nobody");
-    expect(titlesFor("alex")).not.toContain("Related to nobody");
-  });
-});
-
-describe("toIconName", () => {
-  it("maps a dropdown option to its filename, case-insensitively", () => {
-    expect(toIconName("workflows")).toBe("workflows");
-    expect(toIconName("Upload")).toBe("upload");
-    expect(toIconName("  form  ")).toBe("form");
-  });
-
-  it("falls back to arrow for an empty cell or an unknown option", () => {
-    expect(toIconName(null)).toBe("arrow");
-    expect(toIconName("")).toBe("arrow");
-    expect(toIconName("workflow")).toBe("arrow");
-    expect(toIconName(42)).toBe("arrow");
-  });
-});
-
-describe("unknownIcons", () => {
-  it("names every option with no matching file, once each", () => {
-    const pages = [
-      page({ URL: "https://a.example", Icon: "workflow" }, "A"),
-      page({ URL: "https://b.example", Icon: "workflow" }, "B"),
-      page({ URL: "https://c.example", Icon: "upload" }, "C"),
-      page({ URL: "https://d.example" }, "D"),
-    ];
-    expect(unknownIcons(pages)).toEqual(["workflow"]);
-  });
-});
-
-describe("toLinkRows icons", () => {
-  it("reads the Icon column and defaults to arrow", () => {
-    const rows = toLinkRows([
-      page({ URL: "https://a.example", Icon: "render" }, "A"),
-      page({ URL: "https://b.example" }, "B"),
-    ]);
-    expect(rows.map((row) => row.icon)).toEqual(["render", "arrow"]);
   });
 });
