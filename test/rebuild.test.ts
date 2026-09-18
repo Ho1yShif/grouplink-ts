@@ -2,6 +2,7 @@
 // chained ctx.run to the owning package's *Impl with a fake injected at the vendor
 // port. No network, no secrets — but the pack code, the DTO mapping, and the
 // composition in src/rebuild.ts are all real.
+import { fromPartial } from "@total-typescript/shoehorn";
 import { describe, expect, it, vi } from "vitest";
 import type { TaskContext } from "@renderinc/sdk/workflows";
 
@@ -118,6 +119,9 @@ interface Fakes {
   links?: ReturnType<typeof rawPage>[];
 }
 
+/** The input type one task's *Impl takes, so each route below reads typed input. */
+type Input<F extends (...args: never[]) => unknown> = Parameters<F>[1];
+
 function harness(fakes: Fakes = {}) {
   let inFlight = 0;
   let peakInFlight = 0;
@@ -147,11 +151,11 @@ function harness(fakes: Fakes = {}) {
   );
   const createCommit = vi.fn(async () => ({ sha: "commit1" }));
   const updateRef = vi.fn(async () => {});
-  const slackPost = vi.fn(async () => ({ ok: true as const }));
+  const slackPost = vi.fn(async () => true);
   const triggerDeployPort = vi.fn(async () => ({
     id: "dep-1",
     serviceId: "srv-1",
-    status: "created",
+    status: "created" as const,
     commitId: "commit1",
     createdAt: "",
     finishedAt: null,
@@ -162,90 +166,117 @@ function harness(fakes: Fakes = {}) {
     set: kvSet,
   };
 
-  const routes: Record<string, (args: unknown) => Promise<unknown>> = {
-    "notion.queryDatabase": (a) => {
-      const { databaseId } = a as { databaseId: string };
-      const rows = databaseId === "db_people" ? PEOPLE_PAGES : (fakes.links ?? LINK_PAGES);
-      return queryDatabaseImpl(ctx, a as never, {
-        notion: { queryDatabase: async () => rows } as never,
-      });
+  /**
+   * One fake per ctx.run the workflow makes. Each route reads the task's own input
+   * type, and hands the package's real *Impl a partial vendor port, so a port whose
+   * signature changed fails here rather than passing unchecked.
+   */
+  const routes = {
+    "notion.queryDatabase": (input: Input<typeof queryDatabaseImpl>) => {
+      const rows = input.databaseId === "db_people" ? PEOPLE_PAGES : (fakes.links ?? LINK_PAGES);
+      return queryDatabaseImpl(
+        ctx,
+        input,
+        fromPartial({ notion: { queryDatabase: async () => rows } }),
+      );
     },
-    "scrape.extractMetadata": (a) =>
-      extractPageMetadataImpl(ctx, a as never, { scrape: { fetch: scrapeFetch } as never }),
-    "kv.get": (a) => kvGetImpl(ctx, a as never, { kv } as never),
-    "kv.set": (a) => kvSetImpl(ctx, a as never, { kv } as never),
-    "http.request": (a) => {
-      const url = (a as { url: string }).url;
-      const status = fakes.statuses?.[url] ?? 200;
-      return requestImpl(ctx, a as never, {
-        http: {
-          fetch: async () => ({
-            status,
-            ok: status < 400,
-            headers: new Map<string, string>() as never,
-            text: async () => "",
-          }),
-        } as never,
-      });
+    "scrape.extractMetadata": (input: Input<typeof extractPageMetadataImpl>) =>
+      extractPageMetadataImpl(ctx, input, fromPartial({ scrape: { fetch: scrapeFetch } })),
+    "kv.get": (input: Input<typeof kvGetImpl>) => kvGetImpl(ctx, input, fromPartial({ kv })),
+    "kv.set": (input: Input<typeof kvSetImpl>) => kvSetImpl(ctx, input, fromPartial({ kv })),
+    "http.request": (input: Input<typeof requestImpl>) => {
+      const status = fakes.statuses?.[input.url] ?? 200;
+      return requestImpl(
+        ctx,
+        input,
+        fromPartial({
+          http: {
+            fetch: async () => ({
+              status,
+              ok: status < 400,
+              headers: new Map<string, string>(),
+              text: async () => "",
+            }),
+          },
+        }),
+      );
     },
-    "github.listTree": (a) =>
-      listTreeImpl(ctx, a as never, {
-        github: {
-          listTree: async () => ({
-            paths: fakes.onBranch ?? Object.keys(fakes.current ?? {}),
-            truncated: false,
-          }),
-        } as never,
-      }),
-    "github.getFileContents": (a) => {
-      const path = (a as { path: string }).path;
-      return getFileContentsImpl(ctx, a as never, {
-        github: {
-          getFileContents: async () => ({
-            path,
-            content: fakes.current?.[path] ?? "<html>stale</html>",
-            sha: "sha1",
-            encoding: "utf-8",
-          }),
-        } as never,
-      });
-    },
-    "github.commitFiles": (a) =>
-      commitFilesImpl(ctx, a as never, {
-        github: {
-          getRef: async () => ({ sha: "head1", treeSha: "tree0" }),
-          createBlob,
-          createTree,
-          createCommit,
-          updateRef,
-        } as never,
-      }),
-    "render.triggerDeploy": (a) =>
-      triggerDeployImpl(ctx, a as never, { render: { triggerDeploy: triggerDeployPort } as never }),
-    "render.awaitDeploy": (a) =>
-      awaitDeployImpl(ctx, a as never, {
-        render: {
-          getDeploy: async () => ({
-            id: "dep-1",
-            serviceId: "srv-1",
-            status: "live",
-            commitId: "commit1",
-            createdAt: "",
-            finishedAt: "",
-          }),
-        } as never,
-      }),
-    "slack.postMessage": (a) =>
-      postMessageImpl(ctx, a as never, { slack: { post: slackPost } as never }),
+    "github.listTree": (input: Input<typeof listTreeImpl>) =>
+      listTreeImpl(
+        ctx,
+        input,
+        fromPartial({
+          github: {
+            listTree: async () => ({
+              paths: fakes.onBranch ?? Object.keys(fakes.current ?? {}),
+              truncated: false,
+            }),
+          },
+        }),
+      ),
+    "github.getFileContents": (input: Input<typeof getFileContentsImpl>) =>
+      getFileContentsImpl(
+        ctx,
+        input,
+        fromPartial({
+          github: {
+            getFileContents: async () => ({
+              path: input.path,
+              content: fakes.current?.[input.path] ?? "<html>stale</html>",
+              sha: "sha1",
+              encoding: "utf-8" as const,
+            }),
+          },
+        }),
+      ),
+    "github.commitFiles": (input: Input<typeof commitFilesImpl>) =>
+      commitFilesImpl(
+        ctx,
+        input,
+        fromPartial({
+          github: {
+            getRef: async () => ({ sha: "head1", treeSha: "tree0" }),
+            createBlob,
+            createTree,
+            createCommit,
+            updateRef,
+          },
+        }),
+      ),
+    "render.triggerDeploy": (input: Input<typeof triggerDeployImpl>) =>
+      triggerDeployImpl(ctx, input, fromPartial({ render: { triggerDeploy: triggerDeployPort } })),
+    "render.awaitDeploy": (input: Input<typeof awaitDeployImpl>) =>
+      awaitDeployImpl(
+        ctx,
+        input,
+        fromPartial({
+          render: {
+            getDeploy: async () => ({
+              id: "dep-1",
+              serviceId: "srv-1",
+              status: "live" as const,
+              commitId: "commit1",
+              createdAt: "",
+              finishedAt: "",
+            }),
+          },
+        }),
+      ),
+    "slack.postMessage": (input: Input<typeof postMessageImpl>) =>
+      postMessageImpl(ctx, input, fromPartial({ slack: { post: slackPost } })),
   };
 
-  const ctx: TaskContext = {
+  const ctx: TaskContext = fromPartial({
     run: async (taskDef: { name?: string }, ...args: unknown[]) => {
-      const route = routes[taskDef?.name ?? ""];
+      // The one unchecked step: ctx.run is generic over every task, so the routes
+      // are keyed by name and the input arrives as unknown.
+      const route = routes[(taskDef?.name ?? "") as keyof typeof routes] as
+        | ((input: never) => Promise<unknown>)
+        | undefined;
       if (!route) throw new Error(`no fake for ctx.run("${taskDef?.name}")`);
-      return route(args[0]);
+      return route(args[0] as never);
     },
-  } as TaskContext;
+  });
 
   /** Path -> HTML handed to github.commitFiles on the last run. */
   const committed = (): Record<string, string> => {
