@@ -18,7 +18,7 @@ const handle = createNotionWebhook({
   dispatch: (task, args) => dispatcher.start(task, args),
   secret: process.env.NOTION_WEBHOOK_SECRET,
   task: process.env.REBUILD_TASK ?? "grouplink.rebuild",
-  debounceMs: envInt(process.env.DEBOUNCE_MS, DEFAULT_DEBOUNCE_MS),
+  debounceMs: envInt("DEBOUNCE_MS", process.env.DEBOUNCE_MS, DEFAULT_DEBOUNCE_MS),
 });
 
 // GET /healthz and POST /tasks/:task come from the package. The task route is how
@@ -38,6 +38,6 @@ app.post("/webhooks/notion", async (c) => {
   });
 });
 
-const port = envInt(process.env.PORT, 3000);
+const port = envInt("PORT", process.env.PORT, 3000);
 serve({ fetch: app.fetch, port });
 console.log(`webhook receiver listening on ${port}`);

@@ -46,10 +46,21 @@ function envFlag(value: string | undefined, fallback: boolean): boolean {
   return !FALSY.has(normalized);
 }
 
-/** Shared with the webhook receiver, which parses its own DEBOUNCE_MS and PORT. */
-export function envInt(value: string | undefined, fallback: number): number {
-  const parsed = Number.parseInt(value ?? "", 10);
-  return Number.isFinite(parsed) ? parsed : fallback;
+/**
+ * A whole number from the environment, or the fallback when the variable is unset.
+ * Anything else throws at startup, because `LINKS_LIMIT=-5` asks Notion for a
+ * negative page size and `DEBOUNCE_MS=10s` used to parse as 10 milliseconds.
+ * Shared with the webhook receiver, which reads its own DEBOUNCE_MS and PORT.
+ */
+export function envInt(name: string, value: string | undefined, fallback: number): number {
+  const raw = value?.trim() ?? "";
+  if (raw === "") return fallback;
+
+  const parsed = Number(raw);
+  if (!/^\d+$/.test(raw) || parsed < 1 || !Number.isSafeInteger(parsed)) {
+    throw new Error(`${name} must be a whole number of 1 or more, got "${raw}"`);
+  }
+  return parsed;
 }
 
 export function loadConfig(
@@ -77,12 +88,12 @@ export function loadConfig(
   return {
     databaseId,
     peopleDatabaseId,
-    limit: input.limit ?? envInt(env.LINKS_LIMIT, 100),
+    limit: input.limit ?? envInt("LINKS_LIMIT", env.LINKS_LIMIT, 100),
     dryRun: input.dryRun ?? envFlag(env.DRY_RUN, false),
 
     defaultSlug,
 
-    cacheTtlSeconds: envInt(env.METADATA_TTL_SECONDS, 86_400),
+    cacheTtlSeconds: envInt("METADATA_TTL_SECONDS", env.METADATA_TTL_SECONDS, 86_400),
 
     repoOwner: env.GITHUB_REPO_OWNER ?? "",
     repoName: env.GITHUB_REPO_NAME ?? "",

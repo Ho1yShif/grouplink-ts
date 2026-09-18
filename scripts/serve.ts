@@ -19,7 +19,7 @@ import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { envInt } from "../src/config.js";
 
-const PORT = envInt(process.env.PORT, 3000);
+const PORT = envInt("PORT", process.env.PORT, 3000);
 const DEBOUNCE_MS = 100;
 const RELOAD_PATH = "/__reload";
 

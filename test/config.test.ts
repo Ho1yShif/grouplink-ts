@@ -1,6 +1,6 @@
 // loadConfig reads only the env it is handed, so each case passes its own.
 import { describe, expect, it } from "vitest";
-import { assertWritable, loadConfig } from "../src/config.js";
+import { assertWritable, envInt, loadConfig } from "../src/config.js";
 
 const ENV = {
   NOTION_LINKS_DATABASE_ID: "db_links",
@@ -63,5 +63,28 @@ describe("assertWritable", () => {
     expect(() => assertWritable(load())).toThrow(
       /GITHUB_REPO_OWNER, GITHUB_REPO_NAME, RENDER_STATIC_SITE_ID/,
     );
+  });
+});
+
+describe("envInt", () => {
+  it("falls back when the variable is unset, empty, or whitespace", () => {
+    expect(envInt("LINKS_LIMIT", undefined, 100)).toBe(100);
+    expect(envInt("LINKS_LIMIT", "", 100)).toBe(100);
+    expect(envInt("LINKS_LIMIT", "  ", 100)).toBe(100);
+  });
+
+  it("reads a whole number, with or without surrounding space", () => {
+    expect(envInt("LINKS_LIMIT", "25", 100)).toBe(25);
+    expect(envInt("LINKS_LIMIT", " 25 ", 100)).toBe(25);
+  });
+
+  it("names the variable it rejects", () => {
+    expect(() => envInt("LINKS_LIMIT", "-5", 100)).toThrow(/LINKS_LIMIT/);
+  });
+
+  it("rejects anything that is not a whole number of 1 or more", () => {
+    for (const value of ["-5", "0", "10abc", "1e3", "2.5", "+5", "abc", "9".repeat(20)]) {
+      expect(() => envInt("LINKS_LIMIT", value, 100), value).toThrow();
+    }
   });
 });
