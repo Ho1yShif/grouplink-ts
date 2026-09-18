@@ -86,7 +86,7 @@ const MAX_TARGET = 44;
  * will not parse.
  */
 function displayTarget(url: string): string {
-  let parsed;
+  let parsed: URL;
   try {
     parsed = new URL(url);
   } catch {
@@ -94,7 +94,7 @@ function displayTarget(url: string): string {
   }
   const path = parsed.pathname.replace(/\/$/, "");
   const target = parsed.hostname.replace(/^www\./, "") + path;
-  return target.length > MAX_TARGET ? target.slice(0, MAX_TARGET - 1) + "\u2026" : target;
+  return target.length > MAX_TARGET ? `${target.slice(0, MAX_TARGET - 1)}\u2026` : target;
 }
 
 function renderCard(card: LinkCard): string {

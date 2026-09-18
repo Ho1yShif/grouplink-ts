@@ -10,6 +10,8 @@
     "start": "node dist/main.js",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
+    "lint": "biome check .",
+    "format": "biome check --write .",
     "test:live": "RUN_LIVE=1 vitest run test/rebuild.live.test.ts",
     "placeholder": "tsx scripts/placeholder.ts",
     "preview": "tsx --env-file=.env scripts/preview.ts",
@@ -28,6 +30,7 @@
     "@renderinc/sdk": "1.0.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.13",
     "@render-lab/test-utils": "0.1.0",
     "@total-typescript/shoehorn": "^0.1.2",
     "@types/node": "^26.1.1",

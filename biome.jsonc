@@ -1,0 +1,36 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.13/schema.json",
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "files": { "includes": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts", "*.json", "*.jsonc"] },
+  "formatter": {
+    "indentStyle": "space",
+    "indentWidth": 2,
+    // Wide enough to leave the existing wrapping alone. The HTML and CSS template
+    // literals in src/render.ts and src/styles.ts run past it and are left as they are.
+    "lineWidth": 100
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "semicolons": "always",
+      "trailingCommas": "all",
+      "arrowParentheses": "always"
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "complexity": {
+        // Notion column names are data, not identifiers. props["Visible"] says so;
+        // props.Visible reads like a field this repo declared.
+        "useLiteralKeys": "off"
+      }
+    }
+  },
+  // Import order is grouped by hand: the workflow packages in the order the run
+  // calls them, then the local modules.
+  "assist": {
+    "actions": { "source": { "organizeImports": "off" } }
+  }
+}

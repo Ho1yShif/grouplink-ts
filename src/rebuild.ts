@@ -218,7 +218,9 @@ async function resolveMetadata(
   const scrapedMeta = missUrls.map(
     (_url, i): CachedMeta => ({ description: cardDescription(scraped[i] ?? {}) }),
   );
-  missUrls.forEach((url, i) => metaByUrl.set(url, scrapedMeta[i] ?? EMPTY_META));
+  missUrls.forEach((url, i) => {
+    metaByUrl.set(url, scrapedMeta[i] ?? EMPTY_META);
+  });
 
   await mapInBatches(missUrls, (url, i) =>
     ctx.run(kvSet, {
