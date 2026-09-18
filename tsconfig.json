@@ -22,8 +22,9 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
 
-    "outDir": "dist",
-    "rootDir": "src"
+    // tsconfig.build.json turns emit back on for src. This config covers the tests
+    // and the scripts too, so `pnpm typecheck` checks everything that is written.
+    "noEmit": true
   },
-  "include": ["src"]
+  "include": ["src", "test", "scripts"]
 }

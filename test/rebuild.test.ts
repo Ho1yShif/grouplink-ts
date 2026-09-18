@@ -135,8 +135,16 @@ function harness(fakes: Fakes = {}) {
     };
   });
   const kvSet = vi.fn(async (_k: string, _v: string, _ttl?: number) => {});
-  const createBlob = vi.fn(async () => ({ sha: "blob1" }));
-  const createTree = vi.fn(async () => ({ sha: "tree1" }));
+  // Typed with the arguments tasks-github passes them, so the assertions below can
+  // read the committed blobs and tree without casting the recorded call.
+  const createBlob = vi.fn(async (_owner: string, _repo: string, _input: { content: string }) => ({
+    sha: "blob1",
+  }));
+  const createTree = vi.fn(
+    async (_owner: string, _repo: string, _input: { tree: Array<{ path: string }> }) => ({
+      sha: "tree1",
+    }),
+  );
   const createCommit = vi.fn(async () => ({ sha: "commit1" }));
   const updateRef = vi.fn(async () => {});
   const slackPost = vi.fn(async () => ({ ok: true as const }));
@@ -241,12 +249,8 @@ function harness(fakes: Fakes = {}) {
 
   /** Path -> HTML handed to github.commitFiles on the last run. */
   const committed = (): Record<string, string> => {
-    const { tree = [] } = (createTree.mock.calls[0]?.[2] ?? {}) as {
-      tree?: Array<{ path: string }>;
-    };
-    const blobs = createBlob.mock.calls.map(
-      (call) => (call[2] as { content: string }).content,
-    );
+    const tree = createTree.mock.calls[0]?.[2].tree ?? [];
+    const blobs = createBlob.mock.calls.map((call) => call[2].content);
     return Object.fromEntries(tree.map((entry, i) => [entry.path, blobs[i] ?? ""]));
   };
 
