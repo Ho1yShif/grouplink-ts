@@ -1,8 +1,8 @@
 // The page's inline <style> block and its one inline script.
 //
-// Visual foundations come from Render's brand system: semantic color tokens in
-// :root with a dark override, PP Neue Montreal for prose, square corners,
-// 1px hairlines, purple reserved for links and focus.
+// The styling follows Render's brand system. Color tokens live in :root with a
+// dark override, the prose is set in Roobert, corners are square, hairlines are
+// 1px, and purple is used only for links and focus.
 //
 // render.ts allows both blocks in the Content-Security-Policy by hash, so any
 // inline style or script the page needs has to be added here.
