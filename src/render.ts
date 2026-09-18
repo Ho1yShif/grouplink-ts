@@ -138,7 +138,7 @@ export const SOCIALS: SocialLink[] = [
 
 function renderSocial(social: SocialLink): string {
   const href = escapeHtml(safeUrl(social.url));
-  const icon = social.label.trim().toLowerCase();
+  const icon = escapeHtml(social.label.trim().toLowerCase());
   const label = escapeHtml(social.label);
   return `        <a class="social" href="${href}" aria-label="${label}"><span class="social__icon social__icon--${icon}"></span></a>`;
 }
