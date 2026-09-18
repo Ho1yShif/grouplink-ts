@@ -1,21 +1,30 @@
 // Tier 2: live integration test. Opt-in only — gated behind RUN_LIVE=1 and real
 // secrets, run via `pnpm test:live`. Never gates `pnpm test` (ADR-0010).
 //
-// Requires NOTION_TOKEN, NOTION_LINKS_DATABASE_ID, and REDIS_URL. Runs in dry-run,
-// so it reads Notion, scrapes, caches, and health-checks without committing or
-// deploying anything.
+// Requires every variable in REQUIRED below. Runs in dry-run, so it reads Notion,
+// scrapes, caches, and health-checks without committing or deploying anything.
 import { localCtx } from "@render-lab/test-utils";
 import { describe, expect, it } from "vitest";
 import { rebuild } from "../src/rebuild.js";
 
+/** Named here so a missing one fails on its own name, not on a config error. */
+const REQUIRED = [
+  "NOTION_TOKEN",
+  "NOTION_LINKS_DATABASE_ID",
+  "NOTION_PEOPLE_DATABASE_ID",
+  "SITE_DEFAULT_SLUG",
+  "REDIS_URL",
+];
+
+function requireEnv(): void {
+  for (const name of REQUIRED) {
+    expect(process.env[name], `set ${name}`).toBeTruthy();
+  }
+}
+
 describe.skipIf(!process.env.RUN_LIVE)("grouplink.rebuild (live)", () => {
   it("reads the real Notion database and enriches every link", async () => {
-    expect(process.env.NOTION_TOKEN, "set NOTION_TOKEN").toBeTruthy();
-    expect(
-      process.env.NOTION_LINKS_DATABASE_ID,
-      "set NOTION_LINKS_DATABASE_ID to the real links database",
-    ).toBeTruthy();
-    expect(process.env.REDIS_URL, "set REDIS_URL to a Key Value instance").toBeTruthy();
+    requireEnv();
 
     const result = await rebuild.func(localCtx(), { dryRun: true });
 
@@ -26,7 +35,7 @@ describe.skipIf(!process.env.RUN_LIVE)("grouplink.rebuild (live)", () => {
   }, 120_000);
 
   it("serves the second run from the Key Value cache", async () => {
-    expect(process.env.REDIS_URL, "set REDIS_URL to a Key Value instance").toBeTruthy();
+    requireEnv();
 
     await rebuild.func(localCtx(), { dryRun: true });
     const second = await rebuild.func(localCtx(), { dryRun: true });
