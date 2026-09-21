@@ -16,14 +16,13 @@ import { watch } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
 import { createServer, type ServerResponse } from "node:http";
 import { extname, join, normalize, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { envInt } from "../src/config.js";
+import { repoRoot } from "./write-pages.js";
 
 const PORT = envInt("PORT", process.env.PORT, 3000);
 const DEBOUNCE_MS = 100;
 const RELOAD_PATH = "/__reload";
 
-const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const siteRoot = resolve(repoRoot, "site");
 
 const CONTENT_TYPES: Record<string, string> = {
