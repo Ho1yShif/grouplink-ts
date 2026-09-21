@@ -448,3 +448,7 @@ Every step is a published task from
 `@render-lab/triggers`. `.npmrc` pins a single physical copy of `@renderinc/sdk`,
 because two copies mean tasks register against different registries and silently
 never run.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

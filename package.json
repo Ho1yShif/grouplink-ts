@@ -2,6 +2,7 @@
   "name": "grouplink",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "description": "Render's links page, rebuilt from Notion by a Render Workflow and deployed as a static site.",
   "scripts": {
