@@ -557,7 +557,7 @@ describe("grouplink.rebuild", () => {
   });
 
   it("does not call a link dead when the site refuses a bot GET", async () => {
-    const h = harness({ statuses: { "https://x.com/render": 403 } });
+    const h = harness({ statuses: { "https://render.com/startups": 403 } });
     const result = await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
     expect(result.deadLinks).toEqual([]);
   });
