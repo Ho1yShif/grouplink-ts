@@ -41,8 +41,6 @@ interface CachedMeta {
   description: string;
 }
 
-const EMPTY_META: CachedMeta = { description: "" };
-
 /**
  * Statuses that mean the URL resolved but refused an unadorned GET. X answers 403 and
  * LinkedIn answers 999 for a request with no browser fingerprint, so neither is dead.
@@ -211,17 +209,16 @@ async function resolveMetadata(
 
   const missUrls = cardUrls.filter((url) => !metaByUrl.has(url));
   const scraped = await mapInBatches(missUrls, (url) => ctx.run(extractPageMetadata, { url }));
-  const scrapedMeta = missUrls.map(
-    (_url, i): CachedMeta => ({ description: cardDescription(scraped[i] ?? {}) }),
-  );
-  missUrls.forEach((url, i) => {
-    metaByUrl.set(url, scrapedMeta[i] ?? EMPTY_META);
-  });
+  const fresh = missUrls.map((url, i): [string, CachedMeta] => [
+    url,
+    { description: cardDescription(scraped[i] ?? {}) },
+  ]);
+  for (const [url, meta] of fresh) metaByUrl.set(url, meta);
 
-  await mapInBatches(missUrls, (url, i) =>
+  await mapInBatches(fresh, ([url, meta]) =>
     ctx.run(kvSet, {
       key: metaCacheKey(url),
-      value: JSON.stringify(scrapedMeta[i] ?? EMPTY_META),
+      value: JSON.stringify(meta),
       ttlSeconds: cfg.cacheTtlSeconds,
     }),
   );
