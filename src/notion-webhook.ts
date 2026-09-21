@@ -49,11 +49,7 @@ export const DEFAULT_DEBOUNCE_MS = 60_000;
  * verification token. Lengths are compared first, because timingSafeEqual throws
  * on buffers of different sizes.
  */
-export function verifySignature(
-  rawBody: string,
-  header: string | undefined,
-  secret: string,
-): boolean {
+function verifySignature(rawBody: string, header: string | undefined, secret: string): boolean {
   if (!header) return false;
   const expected = Buffer.from(
     `sha256=${createHmac("sha256", secret).update(rawBody, "utf8").digest("hex")}`,

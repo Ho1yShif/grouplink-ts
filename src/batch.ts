@@ -5,7 +5,7 @@
  * Without a cap, a 100-row database opens 100 concurrent runs per stage and hits
  * every linked site at once.
  */
-export const BATCH_SIZE = 10;
+const BATCH_SIZE = 10;
 
 /** Promise.all in fixed-size batches, in input order. */
 export async function mapInBatches<T, R>(

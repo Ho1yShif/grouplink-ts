@@ -24,7 +24,7 @@ export interface LinkCard {
   icon: IconName;
 }
 
-export interface SocialLink {
+interface SocialLink {
   label: string;
   url: string;
 }
@@ -128,7 +128,7 @@ const LOGO_HREF = "https://dashboard.render.com/";
  * Notion. Each label needs a matching file under site/assets/icons and a
  * .social__icon--<label> rule in styles.ts.
  */
-export const SOCIALS: SocialLink[] = [
+const SOCIALS: SocialLink[] = [
   { label: "YouTube", url: "https://www.youtube.com/@render-inc" },
   { label: "LinkedIn", url: "https://www.linkedin.com/company/renderco" },
   { label: "X", url: "https://x.com/render" },
