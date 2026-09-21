@@ -78,8 +78,7 @@ function stringField(body: unknown, key: string): string {
  * whatever else arrives.
  */
 export function createNotionWebhook(options: NotionWebhookOptions) {
-  const { dispatch, secret, task } = options;
-  const debounceMs = options.debounceMs ?? DEFAULT_DEBOUNCE_MS;
+  const { dispatch, secret, task, debounceMs = DEFAULT_DEBOUNCE_MS } = options;
   let pending: NodeJS.Timeout | undefined;
 
   function schedule(): void {
