@@ -91,7 +91,7 @@ export function loadConfig(
 
     defaultSlug,
 
-    cacheTtlSeconds: envInt("METADATA_TTL_SECONDS", env.METADATA_TTL_SECONDS, 86_400),
+    cacheTtlSeconds: envInt("METADATA_TTL_SECONDS", env.METADATA_TTL_SECONDS, 604_800),
 
     repoOwner: env.GITHUB_REPO_OWNER ?? "",
     repoName: env.GITHUB_REPO_NAME ?? "",

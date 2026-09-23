@@ -469,7 +469,7 @@ describe("grouplink.rebuild", () => {
     const h = harness();
     await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
     expect(h.kvSet).toHaveBeenCalledTimes(3);
-    expect(h.kvSet.mock.calls[0]?.[2]).toBe(86_400);
+    expect(h.kvSet.mock.calls[0]?.[2]).toBe(604_800);
   });
 
   it("reports unreachable links", async () => {
