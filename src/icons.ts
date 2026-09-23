@@ -8,6 +8,7 @@ export const ICON_NAMES = [
   "arrow",
   "credits",
   "download",
+  "email",
   "form",
   "info",
   "render",
