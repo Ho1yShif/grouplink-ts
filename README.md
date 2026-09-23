@@ -16,7 +16,7 @@ parameters in the Notion URL itself.
 
 ```
 grouplink.rebuild
-├── notion.queryDatabase   ×2   read the link rows and the people
+├── notion.queryDatabase   ×2   read the link rows and the profiles
 ├── kv.get              ×N      look for cached metadata
 ├── scrape.extractMetadata ×N   scrape the misses
 ├── kv.set              ×N      cache them for 24h
@@ -72,7 +72,7 @@ render workflows start grouplink.rebuild --local --input='[{"dryRun":true}]'
 ### Previewing the page
 
 `pnpm preview` reads both Notion databases, scrapes each card's description, and
-writes one `site/<slug>/index.html` per person plus the root copy. It needs
+writes one `site/<slug>/index.html` per profile plus the root copy. It needs
 `NOTION_TOKEN`, both database IDs, and `SITE_DEFAULT_SLUG` in `.env`. It never
 commits, deploys, or touches Key Value, so no `REDIS_URL` is needed.
 
@@ -91,7 +91,7 @@ undoes a preview.
 
 `pnpm placeholder` regenerates the pages under `site/` from the seed links
 without touching Notion, for looking at the design before the databases exist.
-It writes `/shifra`, `/graham`, and a copy of the root person's page at `/`, the
+It writes `/shifra`, `/graham`, and a copy of the root profile's page at `/`, the
 same shape a real run produces.
 
 ## The Notion databases
@@ -104,14 +104,14 @@ There are two. Links:
 | `URL`      | url      | Where the card points.                                                         |
 | `Icon`     | select   | Which icon the card shows. Empty means `arrow`.                                |
 | `Visible`  | checkbox | Unchecked rows are dropped.                                                    |
-| `Everyone` | checkbox | Checked puts the link on every person's page.                                  |
-| `People`   | relation | Which pages the link appears on. Relate it to two rows and it appears on both. |
+| `Everyone` | checkbox | Checked puts the link on every profile's page.                                 |
+| `Profiles` | relation | Which pages the link appears on. Relate it to two rows and it appears on both. |
 
-People:
+Profiles:
 
 | Property  | Type  | Purpose                                     |
 | --------- | ----- | ------------------------------------------- |
-| `Name`    | title | The heading on that person's page.          |
+| `Name`    | title | The heading on that profile's page.         |
 | `Slug`    | text  | The URL path. `shifra` serves at `/shifra`. |
 | `Tagline` | text  | The page description in the metadata. Not shown on the page. |
 
@@ -119,25 +119,29 @@ People:
 
 Each card draws an icon from `site/assets/link-icons/`. The `Icon` select option
 is the filename without `.png`, so the options are `arrow`, `credits`,
-`download`, `form`, `info`, `render`, `upload`, and `workflows`. An empty cell
-renders `arrow`. An option no file matches also renders `arrow`, and the run logs
-the value it could not place.
+`download`, `email`, `form`, `info`, `render`, `upload`, and `workflows`. An
+empty cell renders `arrow`. An option no file matches also renders `arrow`, and
+the run logs the value it could not place.
 
 The files are dark artwork on transparency, drawn as CSS masks and painted with
 the text color, so they read on both the light and the dark background. To add
 one, drop a 32×32 RGBA PNG in that directory, add its name to `ICON_NAMES` in
 `src/icons.ts`, and add the option to the Notion dropdown.
 
-A link's audience is `Everyone` plus whatever `People` names. A row with both set
+A link's audience is `Everyone` plus whatever `Profiles` names. A row with both set
 is redundant, not contradictory, and a row with neither renders nowhere.
 
-A person's page is written to `site/<slug>/index.html`. The person named by
+A profile's page is written to `site/<slug>/index.html`. The profile named by
 `SITE_DEFAULT_SLUG` is written to `site/index.html` as well, so `/` and their own
 path serve the same page.
 
 Share both databases with the Notion integration that owns `NOTION_TOKEN`.
 
-Reading a relation needs `@render-lab/tasks-notion` 0.6.0 or later.
+Reading a relation needs `@render-lab/tasks-notion` 0.6.0 or later. This repo
+pins 0.5.0 and patches it to the same effect:
+`patches/@render-lab__tasks-notion@0.5.0.patch` adds the `relation` case to
+`simplifyProperty`, and `pnpm-workspace.yaml` registers it under
+`patchedDependencies`. If you upgrade the dependency, delete both.
 
 ## Configuration
 
@@ -145,7 +149,7 @@ Reading a relation needs `@render-lab/tasks-notion` 0.6.0 or later.
 | ---------------------------------------- | ------- | ----------------------------------------------- |
 | `NOTION_TOKEN`                           | —       | Notion integration token.                       |
 | `NOTION_LINKS_DATABASE_ID`               | —       | The links database.                             |
-| `NOTION_PEOPLE_DATABASE_ID`              | —       | The people database.                            |
+| `NOTION_PROFILES_DATABASE_ID`            | —       | The profiles database.                          |
 | `REDIS_URL`                              | —       | Key Value instance holding the metadata cache.  |
 | `GITHUB_TOKEN`                           | —       | Write access to the site repo. See below.       |
 | `GITHUB_REPO_OWNER` / `GITHUB_REPO_NAME` | —       | Where the page is committed.                    |
@@ -155,7 +159,7 @@ Reading a relation needs `@render-lab/tasks-notion` 0.6.0 or later.
 | `SITE_URL`                               | —       | Public URL, quoted in the Slack message.        |
 | `SLACK_WEBHOOK_URL`                      | —       | Optional. Unset logs the digest to the console. |
 | `DRY_RUN`                                | `false` | Set `true` to skip the commit and the deploy.   |
-| `SITE_DEFAULT_SLUG`                      | —       | Slug of the person the root page shows.         |
+| `SITE_DEFAULT_SLUG`                      | —       | Slug of the profile the root page shows.        |
 | `SITE_DIR`                               | `site`  | Directory the pages are committed under.        |
 | `METADATA_TTL_SECONDS`                   | `86400` | How long a scraped description is cached.       |
 | `LINKS_LIMIT`                            | `100`   | Notion rows to read per run.                    |
@@ -170,7 +174,7 @@ The webhook receiver reads its own set, plus `RENDER_API_KEY`:
 | `REBUILD_TASK`          | `grouplink.rebuild` | Task the webhook dispatches.                   |
 | `DEBOUNCE_MS`           | `60000`             | Quiet period before an edit starts a run.      |
 
-Each page's name comes from its People row, not from configuration.
+Each page's name comes from its Profiles row, not from configuration.
 
 Per-run overrides go in the input: `--input='[{"dryRun":false}]'`.
 
@@ -238,7 +242,7 @@ from `/` and from `/<slug>/`.
 
 ## Deploy
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Ho1yShif/grouplink)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Ho1yShif/grouplink-ts)
 
 Blueprints don't support Workflows yet, so the Workflow service is created in the
 Dashboard and everything else comes from [`render.yaml`](render.yaml).
@@ -270,7 +274,7 @@ while `WORKFLOW_SLUG` is empty, and step 5 is what fixes it.
      It starts with `ntn_` and is `NOTION_TOKEN`. Older docs call it the
      Internal Integration Secret.
    - Open the links database in Notion, click **⋯** in the top right, then
-     **Connections > Connect to**, and pick `grouplink`. Repeat on the people
+     **Connections > Connect to**, and pick `grouplink`. Repeat on the profiles
      database. The connection reads nothing you haven't connected it to.
 
    `NOTION_WEBHOOK_SECRET` isn't part of either path. Notion generates it when
@@ -287,7 +291,7 @@ while `WORKFLOW_SLUG` is empty, and step 5 is what fixes it.
    redeploying itself every time the page changes.
 4. Set the [Configuration](#configuration) vars on the Workflow. The webhook
    receiver's table doesn't apply here. Required:
-   - `NOTION_TOKEN`, `NOTION_LINKS_DATABASE_ID`, `NOTION_PEOPLE_DATABASE_ID`.
+   - `NOTION_TOKEN`, `NOTION_LINKS_DATABASE_ID`, `NOTION_PROFILES_DATABASE_ID`.
    - `GITHUB_TOKEN`, `GITHUB_REPO_OWNER`, `GITHUB_REPO_NAME`. See
      [The GitHub token](#the-github-token).
    - `REDIS_URL`, the internal connection string of `grouplink-cache`.
@@ -372,7 +376,7 @@ exists and you know its hostname.
    https://api.notion.com/v1/oauth/authorize?client_id=<CLIENT_ID>&response_type=code&owner=user&redirect_uri=https%3A%2F%2Fgrouplink-webhook.onrender.com%2Foauth
    ```
 
-   Pick the links and people databases, and approve. The browser lands on the
+   Pick the links and profiles databases, and approve. The browser lands on the
    receiver's 404 page. Copy the `?code=` parameter out of the address bar. It
    is a UUID, and it is good for one attempt within ten minutes.
 
