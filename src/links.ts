@@ -22,25 +22,25 @@ export interface LinkRow {
   title: string;
   url: string;
   visible: boolean;
-  /** Renders on every person's page, whatever `personIds` holds. */
+  /** Renders on every profile's page, whatever `profileIds` holds. */
   everyone: boolean;
-  /** Notion page ids of the People rows this link belongs to. */
-  personIds: string[];
+  /** Notion page ids of the Profiles rows this link belongs to. */
+  profileIds: string[];
   /** Which file under site/assets/link-icons the card draws. */
   icon: IconName;
 }
 
-/** One row of the People database. `id` is what a link's relation points at. */
-export interface PersonRow {
+/** One row of the Profiles database. `id` is what a link's relation points at. */
+export interface ProfileRow {
   id: string;
   name: string;
   slug: string;
   tagline: string;
 }
 
-/** A person and the links that relate to them, in the order Notion returned them. */
-export interface PersonPage {
-  person: PersonRow;
+/** A profile and the links that relate to it, in the order Notion returned them. */
+export interface ProfilePage {
+  profile: ProfileRow;
   rows: LinkRow[];
 }
 
@@ -54,13 +54,13 @@ export interface PersonPage {
  */
 function readLinkRow(page: PageDTO): LinkRow {
   const props = page.properties;
-  const related = props["People"];
+  const related = props["Profiles"];
   return {
     title: readString(page.title) || readString(props["Title"]),
     url: readString(props["URL"]),
     visible: props["Visible"] !== false,
     everyone: props["Everyone"] === true,
-    personIds: Array.isArray(related) ? related : [],
+    profileIds: Array.isArray(related) ? related : [],
     icon: toIconName(props["Icon"]),
   };
 }
@@ -81,8 +81,8 @@ export interface SkippedRow {
  * Why a row you can see in Notion is missing from the site. Reads every page, so
  * it can name the rows toLinkRows drops as well as the ones no page claims.
  */
-export function skippedRows(pages: PageDTO[], people: PersonRow[]): SkippedRow[] {
-  const knownIds = new Set(people.map((person) => person.id));
+export function skippedRows(pages: PageDTO[], profiles: ProfileRow[]): SkippedRow[] {
+  const knownIds = new Set(profiles.map((profile) => profile.id));
   const skipped: SkippedRow[] = [];
 
   for (const page of pages) {
@@ -99,10 +99,10 @@ function skipReason(row: LinkRow, knownIds: ReadonlySet<string>): string {
   if (!row.url) return "no URL";
   if (!row.title) return "no Title";
   if (!row.visible) return "Visible is unchecked";
-  if (row.everyone || row.personIds.some((id) => knownIds.has(id))) return "";
-  return row.personIds.length === 0
-    ? "no People relation and Everyone is unchecked"
-    : "its People relation points at no row in the People database";
+  if (row.everyone || row.profileIds.some((id) => knownIds.has(id))) return "";
+  return row.profileIds.length === 0
+    ? "no Profiles relation and Everyone is unchecked"
+    : "its Profiles relation points at no row in the Profiles database";
 }
 
 /**
@@ -123,11 +123,11 @@ export function unknownIcons(pages: PageDTO[]): string[] {
 }
 
 /**
- * People rows. A row without a name or a slug is skipped, because neither the page
+ * Profile rows. A row without a name or a slug is skipped, because neither the page
  * heading nor its path can be built without both.
  */
-export function toPersonRows(pages: PageDTO[]): PersonRow[] {
-  const rows: PersonRow[] = [];
+export function toProfileRows(pages: PageDTO[]): ProfileRow[] {
+  const rows: ProfileRow[] = [];
 
   for (const page of pages) {
     const props = page.properties;
@@ -142,14 +142,14 @@ export function toPersonRows(pages: PageDTO[]): PersonRow[] {
 }
 
 /**
- * One bundle per person. A link related to two people appears in both, and one with
+ * One bundle per profile. A link related to two profiles appears in both, and one with
  * `Everyone` checked appears on every page. The two are a union, so a row with both
  * set is redundant rather than contradictory.
  */
-export function groupByPerson(rows: LinkRow[], people: PersonRow[]): PersonPage[] {
-  return people.map((person) => ({
-    person,
-    rows: rows.filter((row) => row.everyone || row.personIds.includes(person.id)),
+export function groupByProfile(rows: LinkRow[], profiles: ProfileRow[]): ProfilePage[] {
+  return profiles.map((profile) => ({
+    profile,
+    rows: rows.filter((row) => row.everyone || row.profileIds.includes(profile.id)),
   }));
 }
 
@@ -158,13 +158,13 @@ export function uniqueUrls(rows: LinkRow[]): string[] {
   return [...new Set(rows.map((row) => row.url))];
 }
 
-/** The default person is the root page; everyone else lives under their slug. */
+/** The default profile is the root page; every other profile lives under its slug. */
 function pagePath(siteDir: string, slug: string): string {
   return slug ? `${siteDir}/${slug}/index.html` : `${siteDir}/index.html`;
 }
 
 /**
- * Every path one person's page is written to. The default person gets a second
+ * Every path one profile's page is written to. The default profile gets a second
  * copy at the site root, so `/` and `/<default slug>` serve the same bytes.
  */
 export function pagePathsFor(siteDir: string, slug: string, defaultSlug: string): string[] {
@@ -174,13 +174,13 @@ export function pagePathsFor(siteDir: string, slug: string, defaultSlug: string)
 }
 
 /**
- * A default slug that matches no person would publish a site with no root page,
+ * A default slug that matches no profile would publish a site with no root page,
  * so every caller that renders pages checks it before it renders anything.
  */
-export function assertDefaultSlug(people: PersonRow[], defaultSlug: string): void {
-  if (people.some((person) => person.slug === defaultSlug)) return;
+export function assertDefaultSlug(profiles: ProfileRow[], defaultSlug: string): void {
+  if (profiles.some((profile) => profile.slug === defaultSlug)) return;
   throw new Error(
-    `SITE_DEFAULT_SLUG is "${defaultSlug}", which matches no Slug in the People database`,
+    `SITE_DEFAULT_SLUG is "${defaultSlug}", which matches no Slug in the Profiles database`,
   );
 }
 

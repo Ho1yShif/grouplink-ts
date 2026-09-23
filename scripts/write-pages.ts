@@ -1,4 +1,4 @@
-// Shared by scripts/placeholder.ts and scripts/preview.ts: render one person's
+// Shared by scripts/placeholder.ts and scripts/preview.ts: render one profile's
 // page and write it everywhere it belongs under site/.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -9,8 +9,8 @@ import { renderPage, type PageModel } from "../src/render.js";
 export const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 
 /**
- * Writes the page to the person's own path, plus the site root when they are the
- * default person. Paths are relative to the repo root, as the workflow commits them.
+ * Writes the page to the profile's own path, plus the site root when it is the
+ * default profile. Paths are relative to the repo root, as the workflow commits them.
  */
 export function writePages(
   model: PageModel,

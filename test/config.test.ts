@@ -4,7 +4,7 @@ import { assertWritable, envInt, loadConfig } from "../src/config.js";
 
 const ENV = {
   NOTION_LINKS_DATABASE_ID: "db_links",
-  NOTION_PEOPLE_DATABASE_ID: "db_people",
+  NOTION_PROFILES_DATABASE_ID: "db_profiles",
   SITE_DEFAULT_SLUG: "shifra",
 };
 
@@ -42,7 +42,7 @@ describe("loadConfig", () => {
   it("names the variable that is missing", () => {
     expect(() => loadConfig({}, {})).toThrow(/NOTION_LINKS_DATABASE_ID/);
     expect(() => loadConfig({}, { NOTION_LINKS_DATABASE_ID: "x" })).toThrow(
-      /NOTION_PEOPLE_DATABASE_ID/,
+      /NOTION_PROFILES_DATABASE_ID/,
     );
     expect(() => loadConfig({}, { ...ENV, SITE_DEFAULT_SLUG: "" })).toThrow(/SITE_DEFAULT_SLUG/);
   });

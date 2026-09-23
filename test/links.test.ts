@@ -5,7 +5,7 @@ import type { PageDTO } from "@render-lab/tasks-notion";
 import {
   assertDefaultSlug,
   faviconUrl,
-  groupByPerson,
+  groupByProfile,
   pagePathsFor,
   skippedRows,
   toCard,
@@ -13,7 +13,7 @@ import {
   toLinkRows,
   unknownIcons,
   visibleRows,
-  type PersonRow,
+  type ProfileRow,
 } from "../src/links.js";
 
 function page(props: Record<string, unknown>, title: string): PageDTO {
@@ -57,25 +57,25 @@ describe("toLinkRows / visibleRows", () => {
   });
 });
 
-describe("groupByPerson", () => {
-  const people = [
-    { id: "person-shifra", name: "Shifra", slug: "shifra", tagline: "" },
-    { id: "person-alex", name: "Alex", slug: "alex", tagline: "" },
+describe("groupByProfile", () => {
+  const profiles = [
+    { id: "profile-shifra", name: "Shifra", slug: "shifra", tagline: "" },
+    { id: "profile-alex", name: "Alex", slug: "alex", tagline: "" },
   ];
 
   const rows = toLinkRows([
-    page({ URL: "https://shared.example", People: ["person-shifra"] }, "Shifra only"),
+    page({ URL: "https://shared.example", Profiles: ["profile-shifra"] }, "Shifra only"),
     page({ URL: "https://all.example", Everyone: true }, "Everyone"),
     page(
-      { URL: "https://both.example", Everyone: true, People: ["person-shifra"] },
+      { URL: "https://both.example", Everyone: true, Profiles: ["profile-shifra"] },
       "Everyone and related",
     ),
     page({ URL: "https://orphan.example" }, "Related to nobody"),
   ]);
 
   const titlesFor = (slug: string) =>
-    groupByPerson(rows, people)
-      .find((p) => p.person.slug === slug)
+    groupByProfile(rows, profiles)
+      .find((p) => p.profile.slug === slug)
       ?.rows.map((r) => r.title);
 
   it("puts an Everyone row on every page", () => {
@@ -120,8 +120,8 @@ describe("unknownIcons", () => {
 });
 
 describe("skippedRows", () => {
-  const people: PersonRow[] = [
-    { id: "person-shifra", name: "Shifra", slug: "shifra", tagline: "" },
+  const profiles: ProfileRow[] = [
+    { id: "profile-shifra", name: "Shifra", slug: "shifra", tagline: "" },
   ];
 
   it("names the check each row failed", () => {
@@ -131,23 +131,23 @@ describe("skippedRows", () => {
         page({ URL: "https://a.example", Visible: true }, ""),
         page({ URL: "https://b.example", Visible: false }, "Hidden"),
         page({ URL: "https://c.example" }, "Nobody"),
-        page({ URL: "https://d.example", People: ["person-gone"] }, "Stale relation"),
-        page({ URL: "https://e.example", People: ["person-shifra"] }, "Fine"),
+        page({ URL: "https://d.example", Profiles: ["profile-gone"] }, "Stale relation"),
+        page({ URL: "https://e.example", Profiles: ["profile-shifra"] }, "Fine"),
       ],
-      people,
+      profiles,
     );
     expect(skipped.map((row) => [row.title, row.reason])).toEqual([
       ["No URL", "no URL"],
       ["https://a.example", "no Title"],
       ["Hidden", "Visible is unchecked"],
-      ["Nobody", "no People relation and Everyone is unchecked"],
-      ["Stale relation", "its People relation points at no row in the People database"],
+      ["Nobody", "no Profiles relation and Everyone is unchecked"],
+      ["Stale relation", "its Profiles relation points at no row in the Profiles database"],
     ]);
   });
 });
 
 describe("pagePathsFor", () => {
-  it("writes the default person to the root as well as their slug", () => {
+  it("writes the default profile to the root as well as its slug", () => {
     expect(pagePathsFor("site", "shifra", "shifra")).toEqual([
       "site/shifra/index.html",
       "site/index.html",
@@ -160,14 +160,14 @@ describe("pagePathsFor", () => {
 });
 
 describe("assertDefaultSlug", () => {
-  const people: PersonRow[] = [{ id: "p", name: "Shifra", slug: "shifra", tagline: "" }];
+  const profiles: ProfileRow[] = [{ id: "p", name: "Shifra", slug: "shifra", tagline: "" }];
 
-  it("passes when a person carries the slug", () => {
-    expect(() => assertDefaultSlug(people, "shifra")).not.toThrow();
+  it("passes when a profile carries the slug", () => {
+    expect(() => assertDefaultSlug(profiles, "shifra")).not.toThrow();
   });
 
   it("names the slug that matches nobody", () => {
-    expect(() => assertDefaultSlug(people, "nobody")).toThrow(/SITE_DEFAULT_SLUG is "nobody"/);
+    expect(() => assertDefaultSlug(profiles, "nobody")).toThrow(/SITE_DEFAULT_SLUG is "nobody"/);
   });
 });
 

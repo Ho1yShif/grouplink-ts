@@ -2,19 +2,19 @@
 // scrape finds in production written out by hand.
 // The workflow overwrites these files on its first real run; they exist so the
 // static site has something to serve before then, and so the local preview has the
-// same shape as production: one page per person, plus a copy of the default
-// person's page at the root. Run with `pnpm placeholder`.
+// same shape as production: one page per profile, plus a copy of the default
+// profile's page at the root. Run with `pnpm placeholder`.
 import type { IconName } from "../src/icons.js";
 import { toCard } from "../src/links.js";
 import { writePages } from "./write-pages.js";
 
-interface SeedPerson {
+interface SeedProfile {
   name: string;
   slug: string;
   links: Array<{ title: string; url: string; description: string; icon: IconName }>;
 }
 
-const SHARED: SeedPerson["links"] = [
+const SHARED: SeedProfile["links"] = [
   {
     title: "Funded founder? Apply to the Render startup program",
     url: "https://render.com/startups",
@@ -31,7 +31,7 @@ const SHARED: SeedPerson["links"] = [
   },
 ];
 
-const PEOPLE: SeedPerson[] = [
+const PROFILES: SeedProfile[] = [
   {
     name: "Shifra",
     slug: "shifra",
@@ -65,13 +65,13 @@ const PEOPLE: SeedPerson[] = [
 const DEFAULT_SLUG = "shifra";
 const TAGLINE = "The fastest path to production for full-stack applications and agents";
 
-for (const person of PEOPLE) {
+for (const profile of PROFILES) {
   writePages(
     {
-      name: person.name,
+      name: profile.name,
       tagline: TAGLINE,
-      cards: person.links.map((link) => toCard(link, link.description)),
+      cards: profile.links.map((link) => toCard(link, link.description)),
     },
-    { siteDir: "site", slug: person.slug, defaultSlug: DEFAULT_SLUG },
+    { siteDir: "site", slug: profile.slug, defaultSlug: DEFAULT_SLUG },
   );
 }

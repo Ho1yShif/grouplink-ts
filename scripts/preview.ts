@@ -1,4 +1,4 @@
-// Renders every person's page from the real Notion databases and writes them into
+// Renders every profile's page from the real Notion databases and writes them into
 // site/, so a local static server can serve the same HTML the workflow commits.
 // Run with `pnpm preview`.
 //
@@ -13,10 +13,10 @@ import { loadConfig } from "../src/config.js";
 import {
   assertDefaultSlug,
   cardDescription,
-  groupByPerson,
+  groupByProfile,
   toCard,
   toLinkRows,
-  toPersonRows,
+  toProfileRows,
   uniqueUrls,
   visibleRows,
 } from "../src/links.js";
@@ -25,15 +25,15 @@ import { writePages } from "./write-pages.js";
 const ctx = localCtx();
 const cfg = loadConfig({ dryRun: true });
 
-const [linkPages, peoplePages] = await Promise.all([
+const [linkPages, profilePages] = await Promise.all([
   ctx.run(queryDatabase, { databaseId: cfg.databaseId, limit: cfg.limit }),
-  ctx.run(queryDatabase, { databaseId: cfg.peopleDatabaseId, limit: cfg.limit }),
+  ctx.run(queryDatabase, { databaseId: cfg.profilesDatabaseId, limit: cfg.limit }),
 ]);
 
-const people = toPersonRows(peoplePages);
-assertDefaultSlug(people, cfg.defaultSlug);
+const profiles = toProfileRows(profilePages);
+assertDefaultSlug(profiles, cfg.defaultSlug);
 
-const pages = groupByPerson(visibleRows(toLinkRows(linkPages)), people);
+const pages = groupByProfile(visibleRows(toLinkRows(linkPages)), profiles);
 const cardUrls = uniqueUrls(pages.flatMap((page) => page.rows));
 
 const scraped = await mapInBatches(cardUrls, (url) => ctx.run(extractPageMetadata, { url }));
@@ -42,10 +42,10 @@ const descriptions = new Map(cardUrls.map((url, i) => [url, cardDescription(scra
 for (const page of pages) {
   writePages(
     {
-      name: page.person.name,
-      tagline: page.person.tagline,
+      name: page.profile.name,
+      tagline: page.profile.tagline,
       cards: page.rows.map((row) => toCard(row, descriptions.get(row.url) ?? "")),
     },
-    { siteDir: cfg.siteDir, slug: page.person.slug, defaultSlug: cfg.defaultSlug },
+    { siteDir: cfg.siteDir, slug: page.profile.slug, defaultSlug: cfg.defaultSlug },
   );
 }

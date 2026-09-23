@@ -18,7 +18,7 @@ import { rebuild } from "../src/rebuild.js";
 
 const ENV = {
   NOTION_LINKS_DATABASE_ID: "db_links",
-  NOTION_PEOPLE_DATABASE_ID: "db_people",
+  NOTION_PROFILES_DATABASE_ID: "db_profiles",
   SITE_DEFAULT_SLUG: "shifra",
   GITHUB_REPO_OWNER: "acme",
   GITHUB_REPO_NAME: "grouplink",
@@ -38,14 +38,14 @@ function withEnv<T>(extra: Record<string, string>, fn: () => T): T {
 
 const titleProp = (text: string) => ({ type: "title", title: [{ plain_text: text }] });
 
-const SHIFRA = "person-shifra";
-const ALEX = "person-alex";
+const SHIFRA = "profile-shifra";
+const ALEX = "profile-alex";
 
 /** Everything about a link row that most cases leave at its default. */
 interface RawPageOptions {
   visible?: boolean;
-  /** Notion page ids of the People rows the link relates to. */
-  people?: string[];
+  /** Notion page ids of the Profiles rows the link relates to. */
+  profiles?: string[];
   everyone?: boolean;
   /** The Icon select option. null is an empty cell. */
   icon?: string | null;
@@ -56,7 +56,7 @@ function rawPage(
   url: string,
   /** Only makes the Notion page id unique. */
   n: number,
-  { visible = true, people = [SHIFRA], everyone = false, icon = null }: RawPageOptions = {},
+  { visible = true, profiles = [SHIFRA], everyone = false, icon = null }: RawPageOptions = {},
 ) {
   return {
     id: `p-${n}`,
@@ -68,13 +68,13 @@ function rawPage(
       URL: { type: "url", url },
       Visible: { type: "checkbox", checkbox: visible },
       Everyone: { type: "checkbox", checkbox: everyone },
-      People: { type: "relation", relation: people.map((id) => ({ id })) },
+      Profiles: { type: "relation", relation: profiles.map((id) => ({ id })) },
       Icon: { type: "select", select: icon === null ? null : { name: icon } },
     },
   };
 }
 
-function rawPerson(id: string, name: string, slug: string, tagline: string) {
+function rawProfile(id: string, name: string, slug: string, tagline: string) {
   return {
     id,
     url: `https://www.notion.so/${id}`,
@@ -89,16 +89,16 @@ function rawPerson(id: string, name: string, slug: string, tagline: string) {
 }
 
 const LINK_PAGES = [
-  // Shared by both people, so it must be scraped and checked exactly once.
-  rawPage("Discord", "https://discord.com/invite/x", 1, { people: [SHIFRA, ALEX] }),
+  // Shared by both profiles, so it must be scraped and checked exactly once.
+  rawPage("Discord", "https://discord.com/invite/x", 1, { profiles: [SHIFRA, ALEX] }),
   rawPage("Startups", "https://render.com/startups", 2),
   rawPage("Hidden", "https://render.com/secret", 3, { visible: false }),
-  rawPage("Alex only", "https://example.com/alex", 4, { people: [ALEX] }),
+  rawPage("Alex only", "https://example.com/alex", 4, { profiles: [ALEX] }),
 ];
 
-const PEOPLE_PAGES = [
-  rawPerson(SHIFRA, "Shifra Williams", "shifra", "Developer relations at Render."),
-  rawPerson(ALEX, "Alex Rivera", "alex", "Engineer at Render."),
+const PROFILE_PAGES = [
+  rawProfile(SHIFRA, "Shifra Williams", "shifra", "Developer relations at Render."),
+  rawProfile(ALEX, "Alex Rivera", "alex", "Engineer at Render."),
 ];
 
 interface Fakes {
@@ -168,7 +168,7 @@ function harness(fakes: Fakes = {}) {
    */
   const routes = {
     "notion.queryDatabase": (input: Input<typeof queryDatabaseImpl>) => {
-      const rows = input.databaseId === "db_people" ? PEOPLE_PAGES : (fakes.links ?? LINK_PAGES);
+      const rows = input.databaseId === "db_profiles" ? PROFILE_PAGES : (fakes.links ?? LINK_PAGES);
       return queryDatabaseImpl(
         ctx,
         input,
@@ -328,7 +328,7 @@ describe("grouplink.rebuild", () => {
     expect(html).toContain('class="card__mark card__mark--arrow"');
   });
 
-  it("puts a person's links in their own file and nobody else's", async () => {
+  it("puts a profile's links in its own file and nobody else's", async () => {
     const h = harness();
     await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
     const files = h.committed();
@@ -346,7 +346,7 @@ describe("grouplink.rebuild", () => {
     const h = harness({
       links: [
         ...LINK_PAGES,
-        rawPage("Careers", "https://render.com/careers", 5, { people: [], everyone: true }),
+        rawPage("Careers", "https://render.com/careers", 5, { profiles: [], everyone: true }),
       ],
     });
     await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
@@ -360,7 +360,7 @@ describe("grouplink.rebuild", () => {
     const h = harness({
       links: [
         ...LINK_PAGES,
-        rawPage("Careers", "https://render.com/careers", 5, { people: [], everyone: true }),
+        rawPage("Careers", "https://render.com/careers", 5, { profiles: [], everyone: true }),
       ],
     });
     await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
@@ -371,7 +371,7 @@ describe("grouplink.rebuild", () => {
     expect(careers).toHaveLength(1);
   });
 
-  it("gives each page its own name and tagline from the People database", async () => {
+  it("gives each page its own name and tagline from the Profiles database", async () => {
     const h = harness();
     await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
     const files = h.committed();
@@ -385,7 +385,7 @@ describe("grouplink.rebuild", () => {
     const h = harness({
       links: [
         ...LINK_PAGES,
-        rawPage("Orphan", "https://example.com/orphan", 20, { people: [] }),
+        rawPage("Orphan", "https://example.com/orphan", 20, { profiles: [] }),
         rawPage("No URL", "", 21),
       ],
     });
@@ -396,14 +396,14 @@ describe("grouplink.rebuild", () => {
         expect.objectContaining({ title: "Hidden", reason: "Visible is unchecked" }),
         expect.objectContaining({
           title: "Orphan",
-          reason: "no People relation and Everyone is unchecked",
+          reason: "no Profiles relation and Everyone is unchecked",
         }),
         expect.objectContaining({ title: "No URL", reason: "no URL" }),
       ]),
     );
   });
 
-  it("serves the default person at the root, byte for byte", async () => {
+  it("serves the default profile at the root, byte for byte", async () => {
     const h = harness();
     await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
     const files = h.committed();
@@ -527,7 +527,7 @@ describe("grouplink.rebuild", () => {
     expect(second.triggerDeployPort).not.toHaveBeenCalled();
   });
 
-  it("commits a brand-new person's page, which is not on the branch yet", async () => {
+  it("commits a brand-new profile's page, which is not on the branch yet", async () => {
     const first = harness();
     await withEnv({ DRY_RUN: "false" }, () => rebuild.func(first.ctx, {}));
     const rendered = first.committed();

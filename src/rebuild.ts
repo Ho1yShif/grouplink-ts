@@ -1,4 +1,4 @@
-// grouplink.rebuild — read the people and their links from Notion, enrich them,
+// grouplink.rebuild — read the profiles and their links from Notion, enrich them,
 // render one page each, commit the pages that changed, deploy, and say so in Slack.
 //
 // Every `await ctx.run(...)` below is a separate durable run on its own instance,
@@ -20,18 +20,18 @@ import { DEFAULT_ICON } from "./icons.js";
 import {
   assertDefaultSlug,
   cardDescription,
-  groupByPerson,
+  groupByProfile,
   skippedRows,
   metaCacheKey,
   pagePathsFor,
   toCard,
   toLinkRows,
-  toPersonRows,
+  toProfileRows,
   uniqueUrls,
   unknownIcons,
   visibleRows,
-  type PersonPage,
-  type PersonRow,
+  type ProfilePage,
+  type ProfileRow,
   type SkippedRow,
 } from "./links.js";
 import { renderPage, type PageModel } from "./render.js";
@@ -53,7 +53,7 @@ interface SiteFile {
 }
 
 export interface RebuildResult {
-  /** People rendered. The root page is a second copy, not another page. */
+  /** Profiles rendered. The root page is a second copy, not another page. */
   pageCount: number;
   /** Distinct card URLs across every page. */
   linkCount: number;
@@ -87,18 +87,18 @@ export const rebuild = task(
 async function runRebuild(ctx: TaskContext, input: RebuildInput): Promise<RebuildResult> {
   const cfg = loadConfig(input);
 
-  // 1) Parallel fan-out: read both databases. A link's `People` relation holds the
-  //    Notion page ids of its People rows, which is how the two join.
-  const [linkPages, peoplePages] = await Promise.all([
+  // 1) Parallel fan-out: read both databases. A link's `Profiles` relation holds the
+  //    Notion page ids of its Profiles rows, which is how the two join.
+  const [linkPages, profilePages] = await Promise.all([
     ctx.run(queryDatabase, { databaseId: cfg.databaseId, limit: cfg.limit }),
-    ctx.run(queryDatabase, { databaseId: cfg.peopleDatabaseId, limit: cfg.limit }),
+    ctx.run(queryDatabase, { databaseId: cfg.profilesDatabaseId, limit: cfg.limit }),
   ]);
 
-  const people = toPersonRows(peoplePages);
-  assertDefaultSlug(people, cfg.defaultSlug);
-  const pages = groupByPerson(visibleRows(toLinkRows(linkPages)), people);
+  const profiles = toProfileRows(profilePages);
+  assertDefaultSlug(profiles, cfg.defaultSlug);
+  const pages = groupByProfile(visibleRows(toLinkRows(linkPages)), profiles);
 
-  const skipped = reportNotionProblems(linkPages, people);
+  const skipped = reportNotionProblems(linkPages, profiles);
 
   // A link on three pages is one URL to look up, scrape, and health-check.
   const cardUrls = uniqueUrls(pages.flatMap((page) => page.rows));
@@ -109,7 +109,7 @@ async function runRebuild(ctx: TaskContext, input: RebuildInput): Promise<Rebuil
   // 3) Batched fan-out: health-check every link.
   const deadLinks = await findDeadLinks(ctx, cardUrls);
 
-  // 4) Render one file per person, plus a second copy of the default person's page
+  // 4) Render one file per profile, plus a second copy of the default profile's page
   //    at the site root.
   const files = renderFiles(pages, metaByUrl, cfg);
 
@@ -176,12 +176,12 @@ async function runRebuild(ctx: TaskContext, input: RebuildInput): Promise<Rebuil
 }
 
 /**
- * Logs what a person can see in Notion but the site does not show: a row that
+ * Logs what you can see in Notion but the site does not show: a row that
  * reaches no page, and an Icon option no file matches. Both are otherwise silent.
  * Returns the skipped rows, which the run reports as part of its result.
  */
-function reportNotionProblems(linkPages: PageDTO[], people: PersonRow[]): SkippedRow[] {
-  const skipped = skippedRows(linkPages, people);
+function reportNotionProblems(linkPages: PageDTO[], profiles: ProfileRow[]): SkippedRow[] {
+  const skipped = skippedRows(linkPages, profiles);
   for (const row of skipped) {
     console.log(`skipped "${row.title}": ${row.reason}`);
   }
@@ -240,15 +240,15 @@ async function findDeadLinks(ctx: TaskContext, cardUrls: string[]): Promise<stri
     .map(({ url, check }) => `${url} (${check?.status ?? "no response"})`);
 }
 
-/** One file per person, plus the default person's page again at the site root. */
+/** One file per profile, plus the default profile's page again at the site root. */
 function renderFiles(
-  pages: PersonPage[],
+  pages: ProfilePage[],
   metaByUrl: Map<string, CachedMeta>,
   cfg: RebuildConfig,
 ): SiteFile[] {
   return pages.flatMap((page) => {
     const content = renderPage(toModel(page, metaByUrl));
-    return pagePathsFor(cfg.siteDir, page.person.slug, cfg.defaultSlug).map((path) => ({
+    return pagePathsFor(cfg.siteDir, page.profile.slug, cfg.defaultSlug).map((path) => ({
       path,
       content,
     }));
@@ -258,7 +258,7 @@ function renderFiles(
 /**
  * The files whose content differs from the branch. listTree comes first because
  * getFileContents throws a 404 on a path that doesn't exist yet, and a new
- * person's page never does.
+ * profile's page never does.
  */
 async function changedFiles(
   ctx: TaskContext,
@@ -305,10 +305,10 @@ function readCached(value: string | null | undefined): CachedMeta | null {
   return null;
 }
 
-function toModel(page: PersonPage, metaByUrl: Map<string, CachedMeta>): PageModel {
+function toModel(page: ProfilePage, metaByUrl: Map<string, CachedMeta>): PageModel {
   return {
-    name: page.person.name,
-    tagline: page.person.tagline,
+    name: page.profile.name,
+    tagline: page.profile.tagline,
     cards: page.rows.map((row) => toCard(row, metaByUrl.get(row.url)?.description ?? "")),
   };
 }

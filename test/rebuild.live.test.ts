@@ -11,7 +11,7 @@ import { rebuild } from "../src/rebuild.js";
 const REQUIRED = [
   "NOTION_TOKEN",
   "NOTION_LINKS_DATABASE_ID",
-  "NOTION_PEOPLE_DATABASE_ID",
+  "NOTION_PROFILES_DATABASE_ID",
   "SITE_DEFAULT_SLUG",
   "REDIS_URL",
 ];

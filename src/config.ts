@@ -4,7 +4,7 @@
 
 export interface RebuildInput {
   databaseId?: string;
-  peopleDatabaseId?: string;
+  profilesDatabaseId?: string;
   dryRun?: boolean;
   limit?: number;
 }
@@ -12,13 +12,13 @@ export interface RebuildInput {
 export interface RebuildConfig {
   /** Notion database holding the link rows. */
   databaseId: string;
-  /** Notion database holding one row per person: Name, Slug, Tagline. */
-  peopleDatabaseId: string;
+  /** Notion database holding one row per profile: Name, Slug, Tagline. */
+  profilesDatabaseId: string;
   limit: number;
   /** Skips the commit, the deploy, and the Slack post. */
   dryRun: boolean;
 
-  /** Slug of the person the root page renders. Their page is written twice. */
+  /** Slug of the profile the root page renders. Its page is written twice. */
   defaultSlug: string;
 
   /** Seconds a scraped metadata record stays in Key Value. */
@@ -72,20 +72,20 @@ export function loadConfig(
     throw new Error("set NOTION_LINKS_DATABASE_ID, or pass databaseId in the run input");
   }
 
-  const peopleDatabaseId = input.peopleDatabaseId ?? env.NOTION_PEOPLE_DATABASE_ID ?? "";
-  if (!peopleDatabaseId) {
-    throw new Error("set NOTION_PEOPLE_DATABASE_ID, or pass peopleDatabaseId in the run input");
+  const profilesDatabaseId = input.profilesDatabaseId ?? env.NOTION_PROFILES_DATABASE_ID ?? "";
+  if (!profilesDatabaseId) {
+    throw new Error("set NOTION_PROFILES_DATABASE_ID, or pass profilesDatabaseId in the run input");
   }
 
   // Required, because an unset value would silently publish a site with no root page.
   const defaultSlug = (env.SITE_DEFAULT_SLUG ?? "").trim().toLowerCase();
   if (!defaultSlug) {
-    throw new Error("set SITE_DEFAULT_SLUG to the slug of the person the root page shows");
+    throw new Error("set SITE_DEFAULT_SLUG to the slug of the profile the root page shows");
   }
 
   return {
     databaseId,
-    peopleDatabaseId,
+    profilesDatabaseId,
     limit: input.limit ?? envInt("LINKS_LIMIT", env.LINKS_LIMIT, 100),
     dryRun: input.dryRun ?? envFlag(env.DRY_RUN, false),
 
