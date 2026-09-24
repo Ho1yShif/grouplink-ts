@@ -10,6 +10,7 @@
 import { createHash } from "node:crypto";
 import type { IconName } from "./icons.js";
 import { ICON_FALLBACK_SCRIPT, STYLES } from "./styles.js";
+import { isMailtoUrl, normalizeMailto } from "./url.js";
 
 export interface LinkCard {
   /** Display text. Comes from Notion, not from the scrape. */
@@ -46,10 +47,11 @@ export function escapeHtml(value: string): string {
 }
 
 /**
- * Allow only http(s) hrefs into the document. Anything else — javascript:,
- * data:, a malformed string from Notion — collapses to "#".
+ * Allow only http(s) and mailto: hrefs into the document. Anything else —
+ * javascript:, data:, a malformed string from Notion — collapses to "#".
  */
 export function safeUrl(value: string): string {
+  if (isMailtoUrl(value)) return normalizeMailto(value);
   try {
     const parsed = new URL(value);
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "#";
@@ -83,9 +85,11 @@ const MAX_TARGET = 44;
 /**
  * What the row shows as its mono metadata line: host without www, plus the path.
  * The path is what tells two rows on the same site apart. Empty when the URL
- * will not parse.
+ * will not parse. A mailto: link shows the whole href, recipients and all,
+ * because it has no host or path to shorten to.
  */
 function displayTarget(url: string): string {
+  if (isMailtoUrl(url)) return truncate(normalizeMailto(url));
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -93,7 +97,10 @@ function displayTarget(url: string): string {
     return "";
   }
   const path = parsed.pathname.replace(/\/$/, "");
-  const target = parsed.hostname.replace(/^www\./, "") + path;
+  return truncate(parsed.hostname.replace(/^www\./, "") + path);
+}
+
+function truncate(target: string): string {
   return target.length > MAX_TARGET ? `${target.slice(0, MAX_TARGET - 1)}\u2026` : target;
 }
 

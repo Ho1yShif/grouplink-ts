@@ -59,6 +59,24 @@ describe("renderPage", () => {
     expect(html).toContain('href="#"');
   });
 
+  it("renders a mailto: card with the address as its target", () => {
+    const html = renderPage({
+      ...model,
+      cards: [
+        {
+          title: "Email",
+          url: "mailto:shifra@render.com",
+          description: "",
+          iconUrl: "",
+          icon: "email",
+        },
+      ],
+    });
+    expect(html).toContain('href="mailto:shifra@render.com"');
+    expect(html).toContain('<span class="card__target">mailto:shifra@render.com</span>');
+    expect(html).not.toContain('class="card__icon"');
+  });
+
   it("keeps the tagline out of the page and on one line in the metadata", () => {
     const html = renderPage({ ...model, tagline: "First half\nsecond half" });
     expect(html).not.toContain('class="tagline"');
@@ -146,5 +164,12 @@ describe("escapeHtml / safeUrl", () => {
     expect(safeUrl("https://render.com/")).toBe("https://render.com/");
     expect(safeUrl("data:text/html,x")).toBe("#");
     expect(safeUrl("not a url")).toBe("#");
+  });
+
+  it("passes a mailto: link through", () => {
+    expect(safeUrl("mailto:shifra@render.com")).toBe("mailto:shifra@render.com");
+    expect(safeUrl("MAILTO:Shifra@Render.com")).toBe("mailto:Shifra@Render.com");
+    expect(safeUrl("mailto:a@b.com,c@d.com")).toBe("mailto:a@b.com,c@d.com");
+    expect(safeUrl("mailto:")).toBe("#");
   });
 });
