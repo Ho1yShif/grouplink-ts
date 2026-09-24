@@ -27,6 +27,7 @@ import {
   toCard,
   toLinkRows,
   toProfileRows,
+  fetchableUrls,
   uniqueUrls,
   unknownIcons,
   visibleRows,
@@ -100,14 +101,17 @@ async function runRebuild(ctx: TaskContext, input: RebuildInput): Promise<Rebuil
 
   const skipped = reportNotionProblems(linkPages, profiles);
 
-  // A link on three pages is one URL to look up, scrape, and health-check.
+  // A link on three pages is one URL to look up, scrape, and health-check. A
+  // mailto: card renders from its Notion row alone, so it is a card URL but not
+  // a web URL and skips steps 2 and 3.
   const cardUrls = uniqueUrls(pages.flatMap((page) => page.rows));
+  const webUrls = fetchableUrls(cardUrls);
 
   // 2) Batched fan-out: read the cache, scrape the misses, write them back.
-  const { metaByUrl, cacheHits } = await resolveMetadata(ctx, cardUrls, cfg);
+  const { metaByUrl, cacheHits } = await resolveMetadata(ctx, webUrls, cfg);
 
   // 3) Batched fan-out: health-check every link.
-  const deadLinks = await findDeadLinks(ctx, cardUrls);
+  const deadLinks = await findDeadLinks(ctx, webUrls);
 
   // 4) Render one file per profile, plus a second copy of the default profile's page
   //    at the site root.

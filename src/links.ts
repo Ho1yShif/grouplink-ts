@@ -2,6 +2,7 @@
 import type { PageDTO } from "@render-lab/tasks-notion";
 import { DEFAULT_ICON, isIconName, type IconName } from "./icons.js";
 import type { LinkCard } from "./render.js";
+import { isHttpUrl, isMailtoUrl } from "./url.js";
 
 function readString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -65,9 +66,19 @@ function readLinkRow(page: PageDTO): LinkRow {
   };
 }
 
-/** Every row that has both a title and a URL, in the order Notion returned them. */
+/**
+ * Whether a card may point at this URL. An http(s) link is scraped and
+ * health-checked; a mailto: link is neither, and still renders. Anything else
+ * would reach the HTTP client as a string it refuses, which fails the whole
+ * rebuild rather than the one row.
+ */
+export function isRenderableUrl(url: string): boolean {
+  return isHttpUrl(url) || isMailtoUrl(url);
+}
+
+/** Every row with a title and a URL the site can link to, in Notion's order. */
 export function toLinkRows(pages: PageDTO[]): LinkRow[] {
-  return pages.map(readLinkRow).filter((row) => row.url && row.title);
+  return pages.map(readLinkRow).filter((row) => isRenderableUrl(row.url) && row.title);
 }
 
 /** A link row read from Notion that renders on no page, and the check it failed. */
@@ -97,6 +108,7 @@ export function skippedRows(pages: PageDTO[], profiles: ProfileRow[]): SkippedRo
 /** Why this row renders nowhere, or "" when it renders. Checks run in read order. */
 function skipReason(row: LinkRow, knownIds: ReadonlySet<string>): string {
   if (!row.url) return "no URL";
+  if (!isRenderableUrl(row.url)) return "URL is neither http://, https://, nor mailto:";
   if (!row.title) return "no Title";
   if (!row.visible) return "Visible is unchecked";
   if (row.everyone || row.profileIds.some((id) => knownIds.has(id))) return "";
@@ -156,6 +168,11 @@ export function groupByProfile(rows: LinkRow[], profiles: ProfileRow[]): Profile
 /** Distinct URLs, first-seen order. A link on three pages is fetched once. */
 export function uniqueUrls(rows: LinkRow[]): string[] {
   return [...new Set(rows.map((row) => row.url))];
+}
+
+/** The URLs worth scraping and health-checking. A mailto: link has no page. */
+export function fetchableUrls(urls: string[]): string[] {
+  return urls.filter(isHttpUrl);
 }
 
 /** The default profile is the root page; every other profile lives under its slug. */

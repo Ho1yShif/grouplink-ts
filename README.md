@@ -101,7 +101,7 @@ There are two. Links:
 | Property   | Type     | Purpose                                                                        |
 | ---------- | -------- | ------------------------------------------------------------------------------ |
 | `Title`    | title    | Card text. Not scraped — this is the copy you control.                         |
-| `URL`      | url      | Where the card points.                                                         |
+| `URL`      | url      | Where the card points. `http://`, `https://`, or `mailto:`; other rows skip.   |
 | `Icon`     | select   | Which icon the card shows. Empty means `arrow`.                                |
 | `Visible`  | checkbox | Unchecked rows are dropped.                                                    |
 | `Everyone` | checkbox | Checked puts the link on every profile's page.                                 |

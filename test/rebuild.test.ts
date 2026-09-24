@@ -120,6 +120,9 @@ type Input<F extends (...args: never[]) => unknown> = Parameters<F>[1];
 function harness(fakes: Fakes = {}) {
   let inFlight = 0;
   let peakInFlight = 0;
+  /** Every URL the health check asked for, in order. */
+  const checked: string[] = [];
+
   const scrapeFetch = vi.fn(async (url: string) => {
     inFlight += 1;
     peakInFlight = Math.max(peakInFlight, inFlight);
@@ -180,6 +183,7 @@ function harness(fakes: Fakes = {}) {
     "kv.get": (input: Input<typeof kvGetImpl>) => kvGetImpl(ctx, input, fromPartial({ kv })),
     "kv.set": (input: Input<typeof kvSetImpl>) => kvSetImpl(ctx, input, fromPartial({ kv })),
     "http.request": (input: Input<typeof requestImpl>) => {
+      checked.push(input.url);
       const status = fakes.statuses?.[input.url] ?? 200;
       return requestImpl(
         ctx,
@@ -286,6 +290,7 @@ function harness(fakes: Fakes = {}) {
   return {
     ctx,
     scrapeFetch,
+    checked,
     peak: () => peakInFlight,
     kvSet,
     createBlob,
@@ -401,6 +406,57 @@ describe("grouplink.rebuild", () => {
         expect.objectContaining({ title: "No URL", reason: "no URL" }),
       ]),
     );
+  });
+
+  it("names the check a URL with no usable scheme failed", async () => {
+    const h = harness({
+      links: [
+        ...LINK_PAGES,
+        rawPage("Schemeless", "render.com/careers", 22),
+        rawPage("FTP", "ftp://example.com", 23),
+      ],
+    });
+    const result = await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
+
+    expect(result.skipped).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          title: "Schemeless",
+          reason: "URL is neither http://, https://, nor mailto:",
+        }),
+        expect.objectContaining({
+          title: "FTP",
+          reason: "URL is neither http://, https://, nor mailto:",
+        }),
+      ]),
+    );
+  });
+
+  it("never fetches a URL with no scheme", async () => {
+    // fetch rejects a URL with no scheme, so before this check one bad Notion row
+    // failed the whole run and the site kept serving the previous commit.
+    const h = harness({ links: [...LINK_PAGES, rawPage("Schemeless", "render.com/careers", 22)] });
+    await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
+
+    const scraped = h.scrapeFetch.mock.calls.map((call) => call[0]);
+    expect(scraped).not.toContain("render.com/careers");
+    expect(h.checked).not.toContain("render.com/careers");
+    expect(h.committedHtml()).not.toContain("Schemeless");
+  });
+
+  it("renders a mailto: row without scraping or checking it", async () => {
+    const address = "mailto:shifra@render.com";
+    const h = harness({ links: [...LINK_PAGES, rawPage("Email me", address, 24)] });
+    const result = await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
+
+    const scraped = h.scrapeFetch.mock.calls.map((call) => call[0]);
+    expect(scraped).not.toContain(address);
+    expect(h.checked).not.toContain(address);
+    expect(result.skipped.map((row) => row.title)).toEqual(["Hidden"]);
+
+    const html = h.committed()["site/shifra/index.html"] ?? "";
+    expect(html).toContain(`href="${address}"`);
+    expect(html).toContain(`<span class="card__target">${address}</span>`);
   });
 
   it("serves the default profile at the root, byte for byte", async () => {
