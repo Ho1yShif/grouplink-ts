@@ -85,11 +85,15 @@ const MAX_TARGET = 44;
 /**
  * What the row shows as its mono metadata line: host without www, plus the path.
  * The path is what tells two rows on the same site apart. Empty when the URL
- * will not parse. A mailto: link shows the whole href, recipients and all,
- * because it has no host or path to shorten to.
+ * will not parse. A mailto: link shows its recipients and stops. Any headers
+ * after the `?` stay in the href but not on the line. A link with headers and
+ * no recipient shows `mailto`.
  */
 function displayTarget(url: string): string {
-  if (isMailtoUrl(url)) return truncate(normalizeMailto(url));
+  if (isMailtoUrl(url)) {
+    const recipients = normalizeMailto(url).split("?")[0];
+    return recipients === "mailto:" ? "mailto" : truncate(recipients);
+  }
   let parsed: URL;
   try {
     parsed = new URL(url);

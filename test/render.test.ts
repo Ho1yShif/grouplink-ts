@@ -77,6 +77,39 @@ describe("renderPage", () => {
     expect(html).not.toContain('class="card__icon"');
   });
 
+  it("keeps mailto: headers in the href but off the target line", () => {
+    const html = renderPage({
+      ...model,
+      cards: [
+        {
+          title: "Email",
+          url: "mailto:shifra@render.com?subject=Hi&body=Hello",
+          description: "",
+          iconUrl: "",
+          icon: "email",
+        },
+      ],
+    });
+    expect(html).toContain('href="mailto:shifra@render.com?subject=Hi&amp;body=Hello"');
+    expect(html).toContain('<span class="card__target">mailto:shifra@render.com</span>');
+  });
+
+  it("labels a mailto: link with no recipient", () => {
+    const html = renderPage({
+      ...model,
+      cards: [
+        {
+          title: "Email",
+          url: "mailto:?subject=Hi",
+          description: "",
+          iconUrl: "",
+          icon: "email",
+        },
+      ],
+    });
+    expect(html).toContain('<span class="card__target">mailto</span>');
+  });
+
   it("keeps the tagline out of the page and on one line in the metadata", () => {
     const html = renderPage({ ...model, tagline: "First half\nsecond half" });
     expect(html).not.toContain('class="tagline"');
