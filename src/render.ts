@@ -91,7 +91,7 @@ const MAX_TARGET = 44;
  */
 function displayTarget(url: string): string {
   if (isMailtoUrl(url)) {
-    const recipients = normalizeMailto(url).split("?")[0];
+    const recipients = normalizeMailto(url).split("?")[0] ?? "mailto:";
     return recipients === "mailto:" ? "mailto" : truncate(recipients);
   }
   let parsed: URL;
