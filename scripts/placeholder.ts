@@ -4,11 +4,12 @@
 // static site has something to serve before then, and so the local preview has the
 // same shape as production: one page per profile, plus a copy of the default
 // profile's page at the root. Run with `pnpm placeholder`.
+import { pathToFileURL } from "node:url";
 import type { IconName } from "../src/icons.js";
 import { toCard } from "../src/links.js";
 import { writePages } from "./write-pages.js";
 
-interface SeedProfile {
+export interface SeedProfile {
   name: string;
   slug: string;
   links: Array<{ title: string; url: string; description: string; icon: IconName }>;
@@ -31,7 +32,7 @@ const SHARED: SeedProfile["links"] = [
   },
 ];
 
-const PROFILES: SeedProfile[] = [
+export const PROFILES: SeedProfile[] = [
   {
     name: "Shifra",
     slug: "shifra",
@@ -62,16 +63,23 @@ const PROFILES: SeedProfile[] = [
   },
 ];
 
-const DEFAULT_SLUG = "shifra";
-const TAGLINE = "The fastest path to production for full-stack applications and agents";
+export const DEFAULT_SLUG = "shifra";
+export const TAGLINE = "The fastest path to production for full-stack applications and agents";
 
-for (const profile of PROFILES) {
-  writePages(
-    {
-      name: profile.name,
-      tagline: TAGLINE,
-      cards: profile.links.map((link) => toCard(link, link.description)),
-    },
-    { siteDir: "site", slug: profile.slug, defaultSlug: DEFAULT_SLUG },
-  );
+export function main(): void {
+  for (const profile of PROFILES) {
+    writePages(
+      {
+        name: profile.name,
+        tagline: TAGLINE,
+        cards: profile.links.map((link) => toCard(link, link.description)),
+      },
+      { siteDir: "site", slug: profile.slug, defaultSlug: DEFAULT_SLUG },
+    );
+  }
+}
+
+// Only write when run as the entry point, so a test can import the seed data.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main();
 }
