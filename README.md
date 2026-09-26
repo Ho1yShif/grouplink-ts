@@ -98,14 +98,15 @@ same shape a real run produces.
 
 There are two. Links:
 
-| Property   | Type     | Purpose                                                                        |
-| ---------- | -------- | ------------------------------------------------------------------------------ |
-| `Title`    | title    | Card text. Not scraped — this is the copy you control.                         |
-| `URL`      | url      | Where the card points. `http://`, `https://`, or `mailto:`; other rows skip.   |
-| `Icon`     | select   | Which icon the card shows. Empty means `arrow`.                                |
-| `Visible`  | checkbox | Unchecked rows are dropped.                                                    |
-| `Everyone` | checkbox | Checked puts the link on every profile's page.                                 |
-| `Profiles` | relation | Which pages the link appears on. Relate it to two rows and it appears on both. |
+| Property   | Type     | Purpose                                                                                   |
+| ---------- | -------- | ----------------------------------------------------------------------------------------- |
+| `Title`    | title    | Card text. Not scraped — this is the copy you control.                                    |
+| `URL`      | url      | Where the card points. `http://`, `https://`, or `mailto:`; other rows skip.              |
+| `Icon`     | select   | Which icon the card shows. Empty means `arrow`.                                           |
+| `Visible`  | checkbox | Unchecked rows are dropped.                                                               |
+| `Everyone` | checkbox | Checked puts the link on every profile's page.                                            |
+| `Profiles` | relation | Which pages the link appears on. Relate it to two rows and it appears on both.            |
+| `Order`    | number   | Card position, lowest first. Ties go oldest first. Rows with no number go last. Required. |
 
 Profiles:
 
@@ -114,6 +115,25 @@ Profiles:
 | `Name`    | title | The heading on that profile's page.         |
 | `Slug`    | text  | The URL path. `shifra` serves at `/shifra`. |
 | `Tagline` | text  | The page description in the metadata. Not shown on the page. |
+
+### Card order
+
+Cards on every page are in ascending `Order`. A profile's page shows its own rows
+and the `Everyone` rows, and a personal row takes its place among the shared rows
+by its number.
+
+- Number the rows in steps of 10. To move a card, give it a number between two
+  others, such as 15.
+- The numbers are shared across profiles. Two personal rows on different pages
+  never appear together, so their numbers can be the same.
+- Make one Notion view per profile. Filter it to `Profiles` contains the profile
+  or `Everyone` is checked, and sort it by `Order`. The view then shows the order
+  of that profile's page.
+- A change to `Order` is a property edit, so it starts a rebuild. Dragging rows in
+  a Notion view does not change the site.
+
+If the `Order` column is missing or renamed, Notion rejects the query and the run
+fails. The site keeps its last deploy.
 
 ### Icons
 

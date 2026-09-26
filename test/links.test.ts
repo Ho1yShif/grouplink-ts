@@ -13,6 +13,7 @@ import {
   toIconName,
   toLinkRows,
   unknownIcons,
+  unnumberedLast,
   visibleRows,
   type ProfileRow,
 } from "../src/links.js";
@@ -69,6 +70,37 @@ describe("toLinkRows / visibleRows", () => {
       page({ URL: "https://b.example" }, "B"),
     ]);
     expect(rows.map((row) => row.icon)).toEqual(["render", "arrow"]);
+  });
+});
+
+describe("toLinkRows / order", () => {
+  it("reads a number as order, and an empty cell or a non-number as null", () => {
+    const rows = toLinkRows([
+      page({ URL: "https://a.example", Order: 10 }, "A"),
+      page({ URL: "https://b.example", Order: 0 }, "B"),
+      page({ URL: "https://c.example", Order: null }, "C"),
+      page({ URL: "https://d.example", Order: "10" }, "D"),
+      page({ URL: "https://e.example" }, "E"),
+    ]);
+    expect(rows.map((row) => row.order)).toEqual([10, 0, null, null, null]);
+  });
+});
+
+describe("unnumberedLast", () => {
+  const rows = toLinkRows([
+    page({ URL: "https://a.example" }, "Empty 1"),
+    page({ URL: "https://b.example", Order: 20 }, "Twenty"),
+    page({ URL: "https://c.example" }, "Empty 2"),
+    page({ URL: "https://d.example", Order: 10 }, "Ten"),
+  ]);
+
+  it("moves rows with no order to the end and keeps input order in both groups", () => {
+    expect(unnumberedLast(rows).map((row) => row.title)).toEqual([
+      "Twenty",
+      "Ten",
+      "Empty 1",
+      "Empty 2",
+    ]);
   });
 });
 

@@ -6,7 +6,7 @@
 // out through mapInBatches, so the run opens at most batch.ts's BATCH_SIZE at a time.
 // Each numbered step below has a helper of the same name further down the file.
 import { task, type TaskContext } from "@renderinc/sdk/workflows";
-import { queryDatabase, type PageDTO } from "@render-lab/tasks-notion";
+import type { PageDTO } from "@render-lab/tasks-notion";
 import { extractPageMetadata } from "@render-lab/tasks-scrape";
 import { get as kvGet, set as kvSet } from "@render-lab/tasks-render-kv";
 import { request } from "@render-lab/tasks-http";
@@ -18,23 +18,19 @@ import { mapInBatches } from "./batch.js";
 import { assertWritable, loadConfig, type RebuildConfig, type RebuildInput } from "./config.js";
 import { DEFAULT_ICON } from "./icons.js";
 import {
-  assertDefaultSlug,
   cardDescription,
-  groupByProfile,
   skippedRows,
   metaCacheKey,
   pagePathsFor,
   toCard,
-  toLinkRows,
-  toProfileRows,
   fetchableUrls,
   uniqueUrls,
   unknownIcons,
-  visibleRows,
   type ProfilePage,
   type ProfileRow,
   type SkippedRow,
 } from "./links.js";
+import { readNotionSite } from "./read-notion.js";
 import { renderPage, type PageModel } from "./render.js";
 
 /** The subset of scrape.extractMetadata we cache and use. */
@@ -88,16 +84,8 @@ export const rebuild = task(
 async function runRebuild(ctx: TaskContext, input: RebuildInput): Promise<RebuildResult> {
   const cfg = loadConfig(input);
 
-  // 1) Parallel fan-out: read both databases. A link's `Profiles` relation holds the
-  //    Notion page ids of its Profiles rows, which is how the two join.
-  const [linkPages, profilePages] = await Promise.all([
-    ctx.run(queryDatabase, { databaseId: cfg.databaseId, limit: cfg.limit }),
-    ctx.run(queryDatabase, { databaseId: cfg.profilesDatabaseId, limit: cfg.limit }),
-  ]);
-
-  const profiles = toProfileRows(profilePages);
-  assertDefaultSlug(profiles, cfg.defaultSlug);
-  const pages = groupByProfile(visibleRows(toLinkRows(linkPages)), profiles);
+  // 1) Parallel fan-out: read both databases.
+  const { linkPages, profiles, pages } = await readNotionSite(ctx, cfg);
 
   const skipped = reportNotionProblems(linkPages, profiles);
 

@@ -14,6 +14,7 @@ import { commitFilesImpl, getFileContentsImpl, listTreeImpl } from "@render-lab/
 import { triggerDeployImpl, awaitDeployImpl } from "@render-lab/tasks-render";
 import { postMessageImpl } from "@render-lab/tasks-slack";
 
+import { LINK_SORTS } from "../src/links.js";
 import { rebuild } from "../src/rebuild.js";
 
 const ENV = {
@@ -49,6 +50,8 @@ interface RawPageOptions {
   everyone?: boolean;
   /** The Icon select option. null is an empty cell. */
   icon?: string | null;
+  /** The Order number. null is an empty cell. */
+  order?: number | null;
 }
 
 function rawPage(
@@ -56,7 +59,13 @@ function rawPage(
   url: string,
   /** Only makes the Notion page id unique. */
   n: number,
-  { visible = true, profiles = [SHIFRA], everyone = false, icon = null }: RawPageOptions = {},
+  {
+    visible = true,
+    profiles = [SHIFRA],
+    everyone = false,
+    icon = null,
+    order = null,
+  }: RawPageOptions = {},
 ) {
   return {
     id: `p-${n}`,
@@ -70,6 +79,7 @@ function rawPage(
       Everyone: { type: "checkbox", checkbox: everyone },
       Profiles: { type: "relation", relation: profiles.map((id) => ({ id })) },
       Icon: { type: "select", select: icon === null ? null : { name: icon } },
+      Order: { type: "number", number: order },
     },
   };
 }
@@ -122,6 +132,8 @@ function harness(fakes: Fakes = {}) {
   let peakInFlight = 0;
   /** Every URL the health check asked for, in order. */
   const checked: string[] = [];
+  /** Every notion.queryDatabase input, in call order. */
+  const queries: Input<typeof queryDatabaseImpl>[] = [];
 
   const scrapeFetch = vi.fn(async (url: string) => {
     inFlight += 1;
@@ -171,6 +183,7 @@ function harness(fakes: Fakes = {}) {
    */
   const routes = {
     "notion.queryDatabase": (input: Input<typeof queryDatabaseImpl>) => {
+      queries.push(input);
       const rows = input.databaseId === "db_profiles" ? PROFILE_PAGES : (fakes.links ?? LINK_PAGES);
       return queryDatabaseImpl(
         ctx,
@@ -291,6 +304,7 @@ function harness(fakes: Fakes = {}) {
     ctx,
     scrapeFetch,
     checked,
+    queries,
     peak: () => peakInFlight,
     kvSet,
     createBlob,
@@ -315,6 +329,36 @@ describe("grouplink.rebuild", () => {
     expect(html.indexOf("Discord")).toBeLessThan(html.indexOf("Startups"));
     expect(html).not.toContain("Hidden");
     expect(html).not.toContain("render.com/secret");
+  });
+
+  it("sorts the links query by Order and leaves the profiles query unsorted", async () => {
+    const h = harness();
+    await withEnv({ DRY_RUN: "true" }, () => rebuild.func(h.ctx, {}));
+
+    const links = h.queries.find((input) => input.databaseId === "db_links");
+    const profiles = h.queries.find((input) => input.databaseId === "db_profiles");
+    expect(links?.sorts).toEqual(LINK_SORTS);
+    expect(profiles?.sorts).toBeUndefined();
+  });
+
+  it("keeps a personal row in its place among the Everyone rows", async () => {
+    const h = harness({
+      links: [
+        rawPage("Docs", "https://render.com/docs", 1, { profiles: [], everyone: true, order: 10 }),
+        rawPage("Mine", "https://example.com/mine", 2, { order: 15 }),
+        rawPage("Blog", "https://render.com/blog", 3, { profiles: [], everyone: true, order: 20 }),
+      ],
+    });
+    await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
+    const files = h.committed();
+
+    const shifra = files["site/shifra/index.html"] ?? "";
+    expect(shifra.indexOf("Docs")).toBeLessThan(shifra.indexOf("Mine"));
+    expect(shifra.indexOf("Mine")).toBeLessThan(shifra.indexOf("Blog"));
+
+    const alex = files["site/alex/index.html"] ?? "";
+    expect(alex).not.toContain("Mine");
+    expect(alex.indexOf("Docs")).toBeLessThan(alex.indexOf("Blog"));
   });
 
   it("renders the icon the Notion row names, and arrow for the rest", async () => {

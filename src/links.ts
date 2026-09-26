@@ -29,6 +29,8 @@ export interface LinkRow {
   profileIds: string[];
   /** Which file under site/assets/link-icons the card draws. */
   icon: IconName;
+  /** The `Order` cell. null when the cell is empty or holds no number. */
+  order: number | null;
 }
 
 /** One row of the Profiles database. `id` is what a link's relation points at. */
@@ -39,7 +41,7 @@ export interface ProfileRow {
   tagline: string;
 }
 
-/** A profile and the links that relate to it, in the order Notion returned them. */
+/** A profile and the links that relate to it, in `Order`. */
 export interface ProfilePage {
   profile: ProfileRow;
   rows: LinkRow[];
@@ -63,7 +65,22 @@ function readLinkRow(page: PageDTO): LinkRow {
     everyone: props["Everyone"] === true,
     profileIds: Array.isArray(related) ? related : [],
     icon: toIconName(props["Icon"]),
+    order: typeof props["Order"] === "number" ? props["Order"] : null,
   };
+}
+
+/** The links query sort. Rows with the same `Order` go oldest first. */
+export const LINK_SORTS = [
+  { property: "Order", direction: "ascending" },
+  { timestamp: "created_time", direction: "ascending" },
+] as const;
+
+/**
+ * The rows with an `Order`, then the rows without one, each group in input order.
+ * The Notion API does not say where a sort puts empty numbers, so this puts them last.
+ */
+export function unnumberedLast(rows: LinkRow[]): LinkRow[] {
+  return [...rows.filter((row) => row.order !== null), ...rows.filter((row) => row.order === null)];
 }
 
 /**
@@ -201,7 +218,7 @@ export function assertDefaultSlug(profiles: ProfileRow[], defaultSlug: string): 
   );
 }
 
-/** Cards render in the order the Notion database returned them. */
+/** The visible rows, in input order. Cards render in this order. */
 export function visibleRows(rows: LinkRow[]): LinkRow[] {
   return rows.filter((row) => row.visible);
 }
