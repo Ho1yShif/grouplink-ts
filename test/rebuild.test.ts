@@ -456,8 +456,8 @@ describe("grouplink.rebuild", () => {
     const h = harness({
       links: [
         ...LINK_PAGES,
-        rawPage("Schemeless", "render.com/careers", 22),
         rawPage("FTP", "ftp://example.com", 23),
+        rawPage("Script", "javascript:alert(1)", 22),
       ],
     });
     const result = await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
@@ -465,27 +465,40 @@ describe("grouplink.rebuild", () => {
     expect(result.skipped).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          title: "Schemeless",
-          reason: "URL is neither http://, https://, nor mailto:",
+          title: "FTP",
+          reason: "URL is not an http, https, or mailto: link",
         }),
         expect.objectContaining({
-          title: "FTP",
-          reason: "URL is neither http://, https://, nor mailto:",
+          title: "Script",
+          reason: "URL is not an http, https, or mailto: link",
         }),
       ]),
     );
   });
 
-  it("never fetches a URL with no scheme", async () => {
-    // fetch rejects a URL with no scheme, so before this check one bad Notion row
-    // failed the whole run and the site kept serving the previous commit.
-    const h = harness({ links: [...LINK_PAGES, rawPage("Schemeless", "render.com/careers", 22)] });
+  it("reads a URL with no scheme as https", async () => {
+    // A Notion cell that holds a bare host renders. The run scrapes and checks the
+    // https URL, because fetch refuses the cell as typed.
+    const h = harness({ links: [...LINK_PAGES, rawPage("Bare host", "render.com/careers", 22)] });
     await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
 
     const scraped = h.scrapeFetch.mock.calls.map((call) => call[0]);
     expect(scraped).not.toContain("render.com/careers");
-    expect(h.checked).not.toContain("render.com/careers");
-    expect(h.committedHtml()).not.toContain("Schemeless");
+    expect(scraped).toContain("https://render.com/careers");
+    expect(h.checked).toContain("https://render.com/careers");
+    expect(h.committedHtml()).toContain("Bare host");
+  });
+
+  it("never fetches a URL fetch refuses", async () => {
+    // fetch rejects a URL with no usable scheme, so before this check one bad Notion
+    // row failed the whole run and the site kept serving the previous commit.
+    const h = harness({ links: [...LINK_PAGES, rawPage("Script", "javascript:alert(1)", 22)] });
+    await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
+
+    const scraped = h.scrapeFetch.mock.calls.map((call) => call[0]);
+    expect(scraped).not.toContain("javascript:alert(1)");
+    expect(h.checked).not.toContain("javascript:alert(1)");
+    expect(h.committedHtml()).not.toContain("Script");
   });
 
   it("renders a mailto: row without scraping or checking it", async () => {

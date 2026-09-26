@@ -2,7 +2,7 @@
 import type { PageDTO } from "@render-lab/tasks-notion";
 import { DEFAULT_ICON, isIconName, type IconName } from "./icons.js";
 import type { LinkCard } from "./render.js";
-import { isHttpUrl, isMailtoUrl } from "./url.js";
+import { isHttpUrl, isMailtoUrl, normalizeUrl } from "./url.js";
 
 function readString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -60,7 +60,7 @@ function readLinkRow(page: PageDTO): LinkRow {
   const related = props["Profiles"];
   return {
     title: readString(page.title) || readString(props["Title"]),
-    url: readString(props["URL"]),
+    url: normalizeUrl(readString(props["URL"])),
     visible: props["Visible"] !== false,
     everyone: props["Everyone"] === true,
     profileIds: Array.isArray(related) ? related : [],
@@ -88,9 +88,12 @@ export function unnumberedLast(rows: LinkRow[]): LinkRow[] {
  * health-checked; a mailto: link is neither, and still renders. Anything else
  * would reach the HTTP client as a string it refuses, which fails the whole
  * rebuild rather than the one row.
+ *
+ * The http branch also parses the URL. An http(s) string the client cannot use, such
+ * as a host with a space in it, fails here instead of in the scrape.
  */
 export function isRenderableUrl(url: string): boolean {
-  return isHttpUrl(url) || isMailtoUrl(url);
+  return (isHttpUrl(url) && URL.canParse(url)) || isMailtoUrl(url);
 }
 
 /** Every row with a title and a URL the site can link to, in Notion's order. */
@@ -125,7 +128,7 @@ export function skippedRows(pages: PageDTO[], profiles: ProfileRow[]): SkippedRo
 /** Why this row renders nowhere, or "" when it renders. Checks run in read order. */
 function skipReason(row: LinkRow, knownIds: ReadonlySet<string>): string {
   if (!row.url) return "no URL";
-  if (!isRenderableUrl(row.url)) return "URL is neither http://, https://, nor mailto:";
+  if (!isRenderableUrl(row.url)) return "URL is not an http, https, or mailto: link";
   if (!row.title) return "no Title";
   if (!row.visible) return "Visible is unchecked";
   if (row.everyone || row.profileIds.some((id) => knownIds.has(id))) return "";

@@ -46,19 +46,23 @@ describe("toLinkRows / visibleRows", () => {
     expect(toLinkRows(pages).map((r) => r.title)).not.toContain("No URL");
   });
 
-  it.each(["render.com/careers", "ftp://example.com", "mailto:", "javascript:alert(1)"])(
+  it.each(["ftp://example.com", "mailto:", "javascript:alert(1)", "https://a b/"])(
     "skips %s, which the site cannot link to",
     (url) => {
       expect(toLinkRows([page({ URL: url }, "Bad")])).toEqual([]);
     },
   );
 
-  it.each(["https://render.com", "http://render.com", "mailto:shifra@render.com"])(
-    "keeps %s",
-    (url) => {
-      expect(toLinkRows([page({ URL: url }, "Good")]).map((r) => r.url)).toEqual([url]);
-    },
-  );
+  it.each(["https://render.com", "mailto:shifra@render.com"])("keeps %s", (url) => {
+    expect(toLinkRows([page({ URL: url }, "Good")]).map((r) => r.url)).toEqual([url]);
+  });
+
+  it.each([
+    ["http://render.com", "https://render.com"],
+    ["render.com/careers", "https://render.com/careers"],
+  ])("reads %s as %s", (cell, expected) => {
+    expect(toLinkRows([page({ URL: cell }, "Good")]).map((r) => r.url)).toEqual([expected]);
+  });
 
   it("keeps the Notion order and drops hidden rows", () => {
     expect(visibleRows(toLinkRows(pages)).map((r) => r.title)).toEqual(["B", "A", "X"]);
@@ -180,8 +184,8 @@ describe("skippedRows", () => {
         page({ URL: "https://c.example" }, "Nobody"),
         page({ URL: "https://d.example", Profiles: ["profile-gone"] }, "Stale relation"),
         page({ URL: "https://e.example", Profiles: ["profile-shifra"] }, "Fine"),
-        page({ URL: "render.com/careers", Profiles: ["profile-shifra"] }, "Schemeless"),
         page({ URL: "ftp://example.com", Profiles: ["profile-shifra"] }, "FTP"),
+        page({ URL: "javascript:alert(1)", Profiles: ["profile-shifra"] }, "Script"),
         page({ URL: "mailto:shifra@render.com", Profiles: ["profile-shifra"] }, "Email"),
       ],
       profiles,
@@ -192,8 +196,8 @@ describe("skippedRows", () => {
       ["Hidden", "Visible is unchecked"],
       ["Nobody", "no Profiles relation and Everyone is unchecked"],
       ["Stale relation", "its Profiles relation points at no row in the Profiles database"],
-      ["Schemeless", "URL is neither http://, https://, nor mailto:"],
-      ["FTP", "URL is neither http://, https://, nor mailto:"],
+      ["FTP", "URL is not an http, https, or mailto: link"],
+      ["Script", "URL is not an http, https, or mailto: link"],
     ]);
   });
 });

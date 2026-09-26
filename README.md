@@ -101,12 +101,18 @@ There are two. Links:
 | Property   | Type     | Purpose                                                                                   |
 | ---------- | -------- | ----------------------------------------------------------------------------------------- |
 | `Title`    | title    | Card text. Not scraped — this is the copy you control.                                    |
-| `URL`      | url      | Where the card points. `http://`, `https://`, or `mailto:`; other rows skip.              |
+| `URL`      | url      | Where the card points. See below.                                                         |
 | `Icon`     | select   | Which icon the card shows. Empty means `arrow`.                                           |
 | `Visible`  | checkbox | Unchecked rows are dropped.                                                               |
 | `Everyone` | checkbox | Checked puts the link on every profile's page.                                            |
 | `Profiles` | relation | Which pages the link appears on. Relate it to two rows and it appears on both.            |
 | `Order`    | number   | Card position, lowest first. Ties go oldest first. Rows with no number go last. Required. |
+
+A `URL` cell is read as `https://`. A cell with no scheme, such as `render.com`,
+gets `https://`, and an `http://` cell is upgraded. A `mailto:` cell keeps its
+scheme, and the card renders without a scrape or a health check. Any other
+scheme, such as `ftp://`, skips the row. The rebuild lists every skipped row and
+the check it failed.
 
 Profiles:
 
@@ -463,6 +469,15 @@ curl -X POST https://grouplink-webhook.onrender.com/tasks/grouplink.rebuild \
   reads `tsconfig.build.json`, which emits `src` alone.
 - `pnpm lint` — Biome's lint rules and formatting. `pnpm format` writes the
   fixes.
+
+`test/golden/` holds the three pages this build renders from the seed links in
+`scripts/placeholder.ts`. `test/render.golden.test.ts` renders them again and
+asserts byte equality. grouplink-py keeps the same three files under
+`tests/golden/`, so either repo catches a change that the other does not make.
+
+There is no logging module here. Python needs one, because its root logger
+defaults to WARNING and drops every `log.info`, so grouplink-py has
+`grouplink/logs.py`. Node prints `console.log` with no setup.
 
 ## Where the tasks come from
 

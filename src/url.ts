@@ -35,3 +35,36 @@ export function isMailtoUrl(value: string): boolean {
 export function normalizeMailto(value: string): string {
   return MAILTO + clean(value).slice(MAILTO.length);
 }
+
+// A scheme and the two slashes that follow it. The test is `://`, not the scheme
+// grammar of RFC 3986, because `render.com` in `render.com:8080/x` also matches that
+// grammar. The `normalize-url` package and a browser address bar make the same test.
+const SCHEME_PREFIX = /^([a-zA-Z][a-zA-Z0-9+.-]*):\/\//;
+
+/**
+ * The URL a card points at, from whatever the Notion cell holds.
+ *
+ * A cell with no scheme gets `https://`. An `http://` cell becomes `https://`. A
+ * `mailto:` cell keeps its scheme. Any other scheme stays as it is, so
+ * `isRenderableUrl` still rejects it.
+ *
+ * A cell that is not a host gets no scheme. `javascript:alert(1)` would become
+ * `https://javascript:alert(1)`, which `isHttpUrl` accepts and the HTTP client cannot
+ * use. The cell is returned unchanged instead, and the row is skipped.
+ */
+export function normalizeUrl(value: string): string {
+  const cleaned = clean(value);
+  if (!cleaned) return "";
+
+  if (cleaned.toLowerCase().startsWith(MAILTO)) return normalizeMailto(cleaned);
+
+  const match = SCHEME_PREFIX.exec(cleaned);
+  if (match) {
+    const scheme = (match[1] as string).toLowerCase();
+    const rest = cleaned.slice(match[0].length);
+    return scheme === "http" ? `https://${rest}` : `${scheme}://${rest}`;
+  }
+
+  const candidate = `https://${cleaned}`;
+  return URL.canParse(candidate) ? candidate : cleaned;
+}
