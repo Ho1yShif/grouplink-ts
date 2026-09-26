@@ -9,7 +9,7 @@ import { localCtx } from "@render-lab/test-utils";
 import { extractPageMetadata } from "@render-lab/tasks-scrape";
 import { mapInBatches } from "../src/batch.js";
 import { loadConfig } from "../src/config.js";
-import { cardDescription, toCard, uniqueUrls } from "../src/links.js";
+import { cardDescription, fetchableUrls, toCard, uniqueUrls } from "../src/links.js";
 import { readNotionSite } from "../src/read-notion.js";
 import { writePages } from "./write-pages.js";
 
@@ -17,7 +17,9 @@ const ctx = localCtx();
 const cfg = loadConfig({ dryRun: true });
 
 const { pages } = await readNotionSite(ctx, cfg);
-const cardUrls = uniqueUrls(pages.flatMap((page) => page.rows));
+// Only the http(s) cards are scraped. A mailto: card has no page, and fetch
+// refuses the URL, which is what grouplink.rebuild does too.
+const cardUrls = fetchableUrls(uniqueUrls(pages.flatMap((page) => page.rows)));
 
 const scraped = await mapInBatches(cardUrls, (url) => ctx.run(extractPageMetadata, { url }));
 const descriptions = new Map(cardUrls.map((url, i) => [url, cardDescription(scraped[i] ?? {})]));
