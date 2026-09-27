@@ -1,72 +1,188 @@
 # Moving grouplink to render-lab
 
-This is the plan to move the repo from `Ho1yShif/grouplink-ts` to
-`render-lab/grouplink-ts` and to replace the personal access token (PAT) with a
-GitHub App owned by render-lab. Do the steps in order. Each step keeps the page
-working or pauses it on purpose.
+This runbook moves `Ho1yShif/grouplink-ts` to `render-lab/grouplink-ts` and
+replaces the personal access token (PAT) with a GitHub App owned by render-lab.
+`grouplink-py` has the same runbook in its `docs/github.md`. The manager steps
+cover both repos, so the manager does them once.
+
+- **Manager**: a render-lab org owner. Creates and installs the app.
+- **IC**: `Ho1yShif`, a render-lab member. Does everything else.
 
 ## End state
 
 - The repo is `render-lab/grouplink-ts`.
-- The Workflow commits pages as a render-lab GitHub App, so its commits show
-  `<app-name>[bot]` as the author.
-- No personal token is set on any Render service, and the old PAT is revoked.
+- The Workflow commits pages as the render-lab GitHub App, so its commits show
+  `<app-slug>[bot]` as the author.
+- No Render service has a personal token set, and the old PAT is revoked.
 
-## Why the order matters
+## Order
 
-- After the transfer, a fine-grained PAT that you scoped to your own account
-  loses access to the repo, so commits fail until the app is in place. A classic
-  PAT keeps working but still acts as you.
-- Render reaches the repo through the Render GitHub App installation on the
-  account that owns it. After the transfer, the installation on your account
-  can't see the repo, so Render can't build or deploy it until the installation
-  on render-lab includes it.
-- The Workflow can't use a GitHub App yet. `@render-lab/tasks-github` 0.8.0 is
-  the latest release, and it builds its client with
-  `new Octokit({ auth: process.env.GITHUB_TOKEN })`. Every `ctx.run` runs on its
-  own instance and reads `GITHUB_TOKEN` from the service environment. An
+Do the steps in this order:
+
+1. IC: [I1. Add GitHub App auth to `@render-lab/tasks-github`](#i1-add-github-app-auth-to-render-labtasks-github)
+2. Manager: [M1. Create the GitHub App](#m1-create-the-github-app)
+3. IC: [I2. Pause the pipeline](#i2-pause-the-pipeline) and [I3. Transfer the repo](#i3-transfer-the-repo)
+4. Manager: [M2. Install the apps](#m2-install-the-apps) and [M3. Let the app push to `main`](#m3-let-the-app-push-to-main)
+5. IC: [I4](#i4-update-render) through [I7](#i7-revoke-the-pat)
+
+I1 and M1 can run at the same time. The rest must follow the order, for these
+reasons:
+
+- The Workflow can't use a GitHub App until I1 ships. `@render-lab/tasks-github`
+  0.8.0 builds its client with `new Octokit({ auth: process.env.GITHUB_TOKEN })`. An
   installation token expires after one hour, so a pasted token stops working
-  between Notion edits. The package needs app support first (step 1).
+  between Notion edits.
+- A fine-grained PAT scoped to `Ho1yShif` loses access to the repo after the
+  transfer, so commits fail until I4 is done. I2 pauses commits for that gap.
+- An app installed with **Only select repositories** can only select repos that
+  render-lab already owns, so M2 must come after I3.
 
-## Permissions you need
+## Manager steps
 
-| Where                                  | Permission                                                                                     | Needed for     |
-| -------------------------------------- | ---------------------------------------------------------------------------------------------- | -------------- |
-| `Ho1yShif/grouplink-ts`                | Admin (you own it)                                                                             | Step 5         |
-| render-lab org                         | Permission to create repos. You are a member and members can create repos, so you have it.     | Step 5         |
-| render-lab org                         | Owner, or the GitHub App manager role, to create the app and install it                        | Steps 2 and 6  |
-| render-lab org                         | Owner, to install the Render GitHub App or add a repo to its installation                      | Step 3         |
-| render-lab org                         | Admin on the new repo, or owner, to edit rulesets and branch protection                        | Step 8         |
-| `render-lab/render-tasks`              | Write, to change `@render-lab/tasks-github` and publish a release                              | Step 1         |
-| Render workspace                       | A role that can edit service settings and environment variables                                | Steps 4 and 7  |
+Run these with `gh` and `jq`, signed in as a render-lab owner. Listing the org's
+app installations needs the `admin:org` scope:
 
-You are a member of render-lab, not an owner. Ask an org owner for the GitHub App
-manager role, or ask them to do steps 2, 3, and 6 with you.
+```bash
+gh auth refresh -h github.com -s admin:org
+```
 
-## The GitHub App's permissions
+### M1. Create the GitHub App
 
-Give the app only these repository permissions:
+GitHub has no API that creates an app. The manifest flow is the closest
+equivalent: a local form posts the app settings, you click one button, and one
+API call returns the credentials.
 
-- `Contents`: Read and write. The run reads the branch tree and the current
-  pages, then commits the changed pages.
-- `Metadata`: Read. GitHub makes this permission mandatory.
+The app gets only these repository permissions. It has no organization
+permissions and no webhook.
 
-Leave every other permission at no access. The app needs no organization or
-account permissions and no webhook events.
+- `Contents`: Read and write. The run reads the current pages and commits new
+  ones.
+- `Metadata`: Read. GitHub requires this permission.
 
-## Steps
+```bash
+cat > /tmp/grouplink-app.html <<'EOF'
+<form id="f" method="post" action="https://github.com/organizations/render-lab/settings/apps/new">
+<input type="hidden" name="manifest" value='{
+  "name": "render-lab-grouplink",
+  "url": "https://grouplink-site.onrender.com",
+  "redirect_url": "https://grouplink-site.onrender.com",
+  "public": false,
+  "hook_attributes": {"url": "https://grouplink-site.onrender.com", "active": false},
+  "default_permissions": {"contents": "write", "metadata": "read"},
+  "default_events": []
+}'>
+</form>
+<script>document.getElementById("f").submit()</script>
+EOF
+open /tmp/grouplink-app.html
+```
 
-### 1. Add GitHub App auth to `@render-lab/tasks-github`
+1. In the browser, click **Create GitHub App**. If GitHub says the name is
+   taken, change `name` in the file and run `open` again. The name becomes the
+   commit author.
+2. GitHub redirects to the grouplink page. Copy the `code` value from the
+   address bar. It expires in one hour.
+3. Exchange the code for the app's credentials:
 
-Change the client in `render-lab/render-tasks` so that it uses
+   ```bash
+   CODE=<code>
+   gh api -X POST "app-manifests/$CODE/conversions" > /tmp/grouplink-app.json
+   jq '{id, slug}' /tmp/grouplink-app.json
+   jq -r .pem /tmp/grouplink-app.json > /tmp/grouplink-app.pem
+   ```
+
+4. Save the app ID, the slug, and the contents of `grouplink-app.pem` in the
+   team password manager, and share the entry with the IC.
+5. Delete the local copies. The JSON file also holds a client secret that the
+   app doesn't use.
+
+   ```bash
+   rm /tmp/grouplink-app.*
+   ```
+
+Don't install the app yet.
+
+### M2. Install the apps
+
+Wait until the IC has transferred both repos (I3).
+
+Install the grouplink app on both repos. In the browser, pick render-lab, then
+**Only select repositories**, then `grouplink-py` and `grouplink-ts`:
+
+```bash
+SLUG=render-lab-grouplink   # the slug from M1
+open "https://github.com/apps/$SLUG/installations/new"
+```
+
+Get the installation ID and add it to the password manager entry:
+
+```bash
+gh api orgs/render-lab/installations \
+  --jq ".installations[] | select(.app_slug==\"$SLUG\") | .id"
+```
+
+Check that Render can see both repos:
+
+```bash
+gh api orgs/render-lab/installations \
+  --jq '.installations[] | select(.app_slug=="render") | {id, repository_selection}'
+```
+
+- `"repository_selection": "all"`: nothing to do.
+- `"repository_selection": "selected"`: add both repos to the installation. The
+  REST endpoint for this accepts only a classic PAT, so use the browser:
+  `open https://github.com/organizations/render-lab/settings/installations/<id>`.
+- No output: Render isn't installed on render-lab. Run
+  `open https://github.com/apps/render/installations/new`, pick render-lab, and
+  select both repos.
+
+Give the IC admin on both repos:
+
+```bash
+for r in grouplink-py grouplink-ts; do
+  gh api -X PUT "repos/render-lab/$r/collaborators/Ho1yShif" -f permission=admin
+done
+```
+
+### M3. Let the app push to `main`
+
+The Workflow commits straight to `main`. A ruleset that requires a pull request
+or a status check blocks it. List the org rulesets:
+
+```bash
+gh api orgs/render-lab/rulesets --jq '.[] | {id, name, enforcement}'
+```
+
+If no active ruleset covers `grouplink-*`, you're done. Otherwise add the app to
+that ruleset's bypass list:
+
+```bash
+RULESET_ID=<id>
+APP_ID=<app id from M1>
+gh api "orgs/render-lab/rulesets/$RULESET_ID" \
+  | jq --argjson app "$APP_ID" \
+      '{bypass_actors: ((.bypass_actors // []) + [{actor_id: $app, actor_type: "Integration", bypass_mode: "always"}])}' \
+  | gh api -X PUT "orgs/render-lab/rulesets/$RULESET_ID" --input -
+```
+
+Tell the IC that M2 and M3 are done.
+
+## IC steps
+
+The IC needs write access to `render-lab/render-tasks` for I1 and a Render
+role that can edit service settings and environment variables.
+
+### I1. Add GitHub App auth to `@render-lab/tasks-github`
+
+Change the client in `render-lab/render-tasks` to use
 [`@octokit/auth-app`](https://github.com/octokit/auth-app.js) when these
-variables are set, and falls back to `GITHUB_TOKEN` when they are not:
+variables are set, and fall back to `GITHUB_TOKEN` when they are not:
 
-| Var                          | Value                                             |
-| ---------------------------- | ------------------------------------------------- |
-| `GITHUB_APP_ID`              | The app's ID, from its settings page.             |
-| `GITHUB_APP_PRIVATE_KEY`     | The PEM private key that you generate in step 2.  |
-| `GITHUB_APP_INSTALLATION_ID` | The ID of the app's installation on render-lab.   |
+| Var                          | Value                        |
+| ---------------------------- | ---------------------------- |
+| `GITHUB_APP_ID`              | The app ID from M1.          |
+| `GITHUB_APP_PRIVATE_KEY`     | The PEM private key from M1. |
+| `GITHUB_APP_INSTALLATION_ID` | The installation ID from M2. |
 
 ```ts
 import { createAppAuth } from "@octokit/auth-app";
@@ -77,107 +193,65 @@ new Octokit({
 });
 ```
 
-`createAppAuth` mints an installation token and gets a new one when the old one
-expires, so nothing outside the Workflow has to refresh the token.
-
+`createAppAuth` mints an installation token and replaces it when it expires.
 The full plan is in `render-tasks/github.md`.
 
-Publish the release, then bump `@render-lab/tasks-github` in this repo. Update
-`.env.example` and the "The GitHub token" section of the README to document
-the three new variables. The PAT keeps working through the fallback, so you can
-merge this change while the repo is still on `Ho1yShif`.
+Publish the release, then bump `@render-lab/tasks-github` here. Document the
+three variables in `.env.example` and in the README section "The GitHub token".
+The PAT still works through the fallback, so this change can merge before the
+transfer.
 
-### 2. Create the GitHub App in render-lab
-
-In render-lab's settings, go to **Developer settings > GitHub Apps > New
-GitHub App**.
-
-- Name it, for example `render-lab-grouplink`. The name is the commit author.
-- Set any homepage URL, such as the repo URL.
-- Under **Webhook**, clear **Active**.
-- Set the permissions from [The GitHub App's permissions](#the-github-apps-permissions).
-- Under **Where can this GitHub App be installed?**, pick **Only on this
-  account**.
-
-After you create the app, note the App ID and click **Generate a private key**.
-Store the downloaded `.pem` file in the team password manager. Don't install the
-app yet, because the repo isn't in render-lab. If you also move `grouplink-py`,
-create one app and install it on both repos.
-
-### 3. Give Render access to render-lab
-
-In render-lab's settings, go to **GitHub Apps** and find the Render app. If it is
-installed with **Only select repositories**, you add the repo in step 6. If it
-isn't installed, connect the render-lab org from the Render Dashboard. Render
-starts the GitHub install flow the first time you pick a repo from a new
-account.
-
-### 4. Pause the pipeline
+### I2. Pause the pipeline
 
 On the Workflow service, set `DRY_RUN=true`. A Notion edit during the move then
-reads and health-checks but doesn't try to commit or deploy.
+reads and health-checks but doesn't commit or deploy.
 
-### 5. Transfer the repo
+### I3. Transfer the repo
 
-On `Ho1yShif/grouplink-ts`, go to **Settings > General > Danger Zone > Transfer**
-and enter `render-lab`. GitHub redirects the old URL to the new one for web and
-git traffic.
-
-Point your local clone at the new URL:
+render-lab lets members create repos, so the IC can transfer into it:
 
 ```bash
+gh api -X POST repos/Ho1yShif/grouplink-ts/transfer -f new_owner=render-lab
 git remote set-url origin git@github.com:render-lab/grouplink-ts.git
 ```
 
-### 6. Install both apps on the repo
+GitHub redirects the old URL for web and git traffic. Transfer `grouplink-py`
+too, then ask the manager to run M2 and M3.
 
-- Install the grouplink GitHub App on render-lab with **Only select
-  repositories** and pick `grouplink-ts`. The installation ID is the number at
-  the end of the installation's settings URL:
-  `https://github.com/organizations/render-lab/settings/installations/<id>`.
-- Add `grouplink-ts` to the Render GitHub App's installation on render-lab.
-
-### 7. Update Render
+### I4. Update Render
 
 On each of the three services (`grouplink-site`, `grouplink-webhook`, and the
-Workflow), open **Settings > Build & Deploy > Repository**. If it still shows
-`Ho1yShif/grouplink-ts`, change it to `render-lab/grouplink-ts`. Do the same for
-the `grouplink` Blueprint if the Dashboard shows it linked to the old repo.
+Workflow), open **Settings > Build & Deploy > Repository**. If it shows
+`Ho1yShif/grouplink-ts`, change it to `render-lab/grouplink-ts`. Do the same
+for the `grouplink` Blueprint if the Dashboard shows it linked to the old repo.
 
-On the Workflow service, set these environment variables:
+On the Workflow service, set these environment variables from the password
+manager entry:
 
 - `GITHUB_REPO_OWNER=render-lab`
 - `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, and `GITHUB_APP_INSTALLATION_ID`.
-  Render accepts a multi-line value, so paste the PEM file as it is.
-- Delete `GITHUB_TOKEN`. If you keep it, the fallback can hide a broken app
-  setup.
+  Paste the PEM as it is. Render accepts multi-line values.
+- Delete `GITHUB_TOKEN`. If it stays, the fallback can hide a broken app setup.
 
-### 8. Check branch protection
-
-The run commits straight to `main` with a fast-forward ref update. If render-lab
-has an org ruleset, or you add a rule on `main` that requires a pull request or a
-passing status check, the commit fails. Add the grouplink app to the rule's
-bypass list, or leave `main` without those rules.
-
-### 9. Update the repo
+### I5. Update the repo
 
 Change the Deploy to Render button in the README from
 `https://github.com/Ho1yShif/grouplink-ts` to
-`https://github.com/render-lab/grouplink-ts`. This is the only reference to
-`Ho1yShif` in the repo. Commit and push to `main`.
+`https://github.com/render-lab/grouplink-ts`. It is the only `Ho1yShif`
+reference in the repo. Commit and push to `main`.
 
-### 10. Verify
+### I6. Verify
 
-1. Start a dry run from the Workflow's Tasks page with
-   `[{"dryRun":true}]` and confirm it finishes.
-2. Remove `DRY_RUN` from the Workflow, or set it to `false`.
-3. Edit a row in Notion. Confirm that a commit by `<app-name>[bot]` appears on
+1. Start a dry run from the Workflow's Tasks page with `[{"dryRun":true}]` and
+   confirm it finishes.
+2. Remove `DRY_RUN` from the Workflow.
+3. Edit a row in Notion. Confirm that a commit by `<app-slug>[bot]` appears on
    `main`, that `grouplink-site` deploys, and that the page shows the edit.
-4. Push a change under `src/` and confirm `grouplink-webhook` deploys from the
-   new repo.
+4. Push a change under `src/` and confirm that `grouplink-webhook` deploys from
+   the new repo.
 
-### 11. Revoke the PAT
+### I7. Revoke the PAT
 
-In your GitHub account, go to **Settings > Developer settings > Personal access
-tokens** and delete the token that the Workflow used. Also delete any copy of it
-in a local `.env` or a password manager.
+In GitHub, go to **Settings > Developer settings > Personal access tokens** and
+delete the token the Workflow used. Delete any copy in a local `.env` or the
+password manager.
