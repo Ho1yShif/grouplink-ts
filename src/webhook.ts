@@ -1,5 +1,5 @@
 // Entry point for grouplink-webhook, the web service Notion posts to. It is the
-// only thing that starts a rebuild now that the cron job is gone.
+// only thing that starts a rebuild.
 //
 // @render-lab/triggers can mount webhook adapters, but an adapter's map() result
 // is dispatched immediately, so the debounce cannot live inside one. This uses

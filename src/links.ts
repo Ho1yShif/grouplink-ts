@@ -1,7 +1,7 @@
 // Notion rows in, page model out. Pure functions — no network, no ctx.
 import type { PageDTO } from "@render-lab/tasks-notion";
 import { DEFAULT_ICON, isIconName, type IconName } from "./icons.js";
-import type { LinkCard } from "./render.js";
+import type { LinkCard, PageModel } from "./render.js";
 import { isHttpUrl, isMailtoUrl, normalizeUrl } from "./url.js";
 
 function readString(value: unknown): string {
@@ -254,6 +254,15 @@ export function toCard(
     description,
     iconUrl: faviconUrl(row.url),
     icon: row.icon,
+  };
+}
+
+/** One profile's page model. `descriptionOf` gives the card blurb for a URL. */
+export function toPageModel(page: ProfilePage, descriptionOf: (url: string) => string): PageModel {
+  return {
+    name: page.profile.name,
+    tagline: page.profile.tagline,
+    cards: page.rows.map((row) => toCard(row, descriptionOf(row.url))),
   };
 }
 

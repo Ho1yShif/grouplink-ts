@@ -62,7 +62,7 @@ export function safeUrl(value: string): string {
 }
 
 /** CSP source expression for an inline block, so the policy allows it by hash. */
-function sha256Source(content: string): string {
+export function sha256Source(content: string): string {
   return `'sha256-${createHash("sha256").update(content, "utf8").digest("base64")}'`;
 }
 

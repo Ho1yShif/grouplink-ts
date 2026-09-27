@@ -9,7 +9,7 @@ import { localCtx } from "@render-lab/test-utils";
 import { extractPageMetadata } from "@render-lab/tasks-scrape";
 import { mapInBatches } from "../src/batch.js";
 import { loadConfig } from "../src/config.js";
-import { cardDescription, fetchableUrls, toCard, uniqueUrls } from "../src/links.js";
+import { cardDescription, fetchableUrls, toPageModel, uniqueUrls } from "../src/links.js";
 import { readNotionSite } from "../src/read-notion.js";
 import { writePages } from "./write-pages.js";
 
@@ -26,11 +26,7 @@ const descriptions = new Map(cardUrls.map((url, i) => [url, cardDescription(scra
 
 for (const page of pages) {
   writePages(
-    {
-      name: page.profile.name,
-      tagline: page.profile.tagline,
-      cards: page.rows.map((row) => toCard(row, descriptions.get(row.url) ?? "")),
-    },
+    toPageModel(page, (url) => descriptions.get(url) ?? ""),
     { siteDir: cfg.siteDir, slug: page.profile.slug, defaultSlug: cfg.defaultSlug },
   );
 }

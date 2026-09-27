@@ -19,11 +19,11 @@ import { assertWritable, loadConfig, type RebuildConfig, type RebuildInput } fro
 import { DEFAULT_ICON } from "./icons.js";
 import {
   cardDescription,
-  skippedRows,
+  fetchableUrls,
   metaCacheKey,
   pagePathsFor,
-  toCard,
-  fetchableUrls,
+  skippedRows,
+  toPageModel,
   uniqueUrls,
   unknownIcons,
   type ProfilePage,
@@ -31,7 +31,7 @@ import {
   type SkippedRow,
 } from "./links.js";
 import { readNotionSite } from "./read-notion.js";
-import { renderPage, type PageModel } from "./render.js";
+import { renderPage } from "./render.js";
 
 /** The subset of scrape.extractMetadata we cache and use. */
 interface CachedMeta {
@@ -189,17 +189,17 @@ function reportNotionProblems(linkPages: PageDTO[], profiles: ProfileRow[]): Ski
  */
 async function resolveMetadata(
   ctx: TaskContext,
-  cardUrls: string[],
+  urls: string[],
   cfg: RebuildConfig,
 ): Promise<{ metaByUrl: Map<string, CachedMeta>; cacheHits: number }> {
   const metaByUrl = new Map<string, CachedMeta>();
-  const cached = await mapInBatches(cardUrls, (url) => ctx.run(kvGet, { key: metaCacheKey(url) }));
-  cardUrls.forEach((url, i) => {
+  const cached = await mapInBatches(urls, (url) => ctx.run(kvGet, { key: metaCacheKey(url) }));
+  urls.forEach((url, i) => {
     const hit = readCached(cached[i]?.value);
     if (hit) metaByUrl.set(url, hit);
   });
 
-  const missUrls = cardUrls.filter((url) => !metaByUrl.has(url));
+  const missUrls = urls.filter((url) => !metaByUrl.has(url));
   const scraped = await mapInBatches(missUrls, (url) => ctx.run(extractPageMetadata, { url }));
   const fresh = missUrls.map((url, i): [string, CachedMeta] => [
     url,
@@ -215,18 +215,18 @@ async function resolveMetadata(
     }),
   );
 
-  return { metaByUrl, cacheHits: cardUrls.length - missUrls.length };
+  return { metaByUrl, cacheHits: urls.length - missUrls.length };
 }
 
 /**
  * Every URL that did not answer, with the status it gave. tasks-http has no HEAD
  * method, so this is a GET whose body we discard.
  */
-async function findDeadLinks(ctx: TaskContext, cardUrls: string[]): Promise<string[]> {
-  const checks = await mapInBatches(cardUrls, (url) =>
+async function findDeadLinks(ctx: TaskContext, urls: string[]): Promise<string[]> {
+  const checks = await mapInBatches(urls, (url) =>
     ctx.run(request, { method: "GET" as const, url }),
   );
-  return cardUrls
+  return urls
     .map((url, i) => ({ url, check: checks[i] }))
     .filter(({ check }) => unreachable(check))
     .map(({ url, check }) => `${url} (${check?.status ?? "no response"})`);
@@ -239,7 +239,7 @@ function renderFiles(
   cfg: RebuildConfig,
 ): SiteFile[] {
   return pages.flatMap((page) => {
-    const content = renderPage(toModel(page, metaByUrl));
+    const content = renderPage(toPageModel(page, (url) => metaByUrl.get(url)?.description ?? ""));
     return pagePathsFor(cfg.siteDir, page.profile.slug, cfg.defaultSlug).map((path) => ({
       path,
       content,
@@ -295,14 +295,6 @@ function readCached(value: string | null | undefined): CachedMeta | null {
     // A malformed cache entry is a miss, not a failure.
   }
   return null;
-}
-
-function toModel(page: ProfilePage, metaByUrl: Map<string, CachedMeta>): PageModel {
-  return {
-    name: page.profile.name,
-    tagline: page.profile.tagline,
-    cards: page.rows.map((row) => toCard(row, metaByUrl.get(row.url)?.description ?? "")),
-  };
 }
 
 async function notify(ctx: TaskContext, text: string, deadLinks: string[]): Promise<void> {

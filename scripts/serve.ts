@@ -11,12 +11,12 @@
 // meta tag on the way out to allow that one script and the event stream. The
 // files on disk keep the policy the workflow commits.
 import { spawn } from "node:child_process";
-import { createHash } from "node:crypto";
 import { watch } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
 import { createServer, type ServerResponse } from "node:http";
 import { extname, join, normalize, resolve } from "node:path";
 import { envInt } from "../src/config.js";
+import { sha256Source } from "../src/render.js";
 import { repoRoot } from "./write-pages.js";
 
 const PORT = envInt("PORT", process.env.PORT, 3000);
@@ -44,7 +44,7 @@ new EventSource('${RELOAD_PATH}').addEventListener('message', function () {
 });
 `;
 
-const RELOAD_SCRIPT_HASH = `'sha256-${createHash("sha256").update(RELOAD_SCRIPT, "utf8").digest("base64")}'`;
+const RELOAD_SCRIPT_HASH = sha256Source(RELOAD_SCRIPT);
 
 /** Widen the committed policy just enough for the reload client. */
 function allowReloadClient(html: string): string {
