@@ -173,6 +173,47 @@ export function toProfileRows(pages: PageDTO[]): ProfileRow[] {
   return rows;
 }
 
+/** Paths the web service answers itself, so no profile can use one as its slug. */
+export const RESERVED_SLUGS = new Set(["assets", "healthz", "tasks", "webhooks"]);
+
+/** Why the web service cannot serve this slug, or "" when it can. */
+function slugProblem(slug: string): string {
+  if (RESERVED_SLUGS.has(slug)) return "is reserved for the web service";
+  if (slug.includes("/")) return 'contains "/"';
+  return "";
+}
+
+/**
+ * The profiles that get a page, and a skipped row for each other profile. The
+ * first profile with a slug gets it.
+ */
+function splitProfiles(profiles: ProfileRow[]): { servable: ProfileRow[]; skipped: SkippedRow[] } {
+  const servable: ProfileRow[] = [];
+  const skipped: SkippedRow[] = [];
+  const taken = new Set<string>();
+  for (const profile of profiles) {
+    let problem = slugProblem(profile.slug);
+    if (!problem && taken.has(profile.slug)) problem = "is already used by another profile";
+    if (problem) {
+      skipped.push({ title: profile.name, url: "", reason: `Slug "${profile.slug}" ${problem}` });
+    } else {
+      taken.add(profile.slug);
+      servable.push(profile);
+    }
+  }
+  return { servable, skipped };
+}
+
+/** The profiles the web service serves as a page, one per slug. */
+export function servableProfiles(profiles: ProfileRow[]): ProfileRow[] {
+  return splitProfiles(profiles).servable;
+}
+
+/** Why each other profile gets no page. Reported with the skipped rows. */
+export function unservableProfiles(profiles: ProfileRow[]): SkippedRow[] {
+  return splitProfiles(profiles).skipped;
+}
+
 /**
  * One bundle per profile. A link related to two profiles appears in both, and one with
  * `Everyone` checked appears on every page. The two are a union, so a row with both
@@ -215,6 +256,8 @@ export function pagePathsFor(siteDir: string, slug: string, defaultSlug: string)
  * so every caller that renders pages checks it before it renders anything.
  */
 export function assertDefaultSlug(profiles: ProfileRow[], defaultSlug: string): void {
+  const problem = slugProblem(defaultSlug);
+  if (problem) throw new Error(`SITE_DEFAULT_SLUG "${defaultSlug}" ${problem}`);
   if (profiles.some((profile) => profile.slug === defaultSlug)) return;
   throw new Error(
     `SITE_DEFAULT_SLUG is "${defaultSlug}", which matches no Slug in the Profiles database`,

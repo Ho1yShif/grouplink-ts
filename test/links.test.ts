@@ -8,12 +8,14 @@ import {
   fetchableUrls,
   groupByProfile,
   pagePathsFor,
+  servableProfiles,
   skippedRows,
   toCard,
   toIconName,
   toLinkRows,
   unknownIcons,
   unnumberedLast,
+  unservableProfiles,
   visibleRows,
   type ProfileRow,
 } from "../src/links.js";
@@ -224,6 +226,40 @@ describe("assertDefaultSlug", () => {
 
   it("names the slug that matches nobody", () => {
     expect(() => assertDefaultSlug(profiles, "nobody")).toThrow(/SITE_DEFAULT_SLUG is "nobody"/);
+  });
+
+  it("names a reserved slug as reserved", () => {
+    expect(() => assertDefaultSlug(profiles, "assets")).toThrow(
+      /SITE_DEFAULT_SLUG "assets" is reserved/,
+    );
+  });
+});
+
+describe("servableProfiles / unservableProfiles", () => {
+  const profile = (id: string, name: string, slug: string): ProfileRow => ({
+    id,
+    name,
+    slug,
+    tagline: "",
+  });
+  const mixed = [
+    profile("profile-shifra", "Shifra", "shifra"),
+    profile("profile-alex", "Alex", "alex"),
+    profile("profile-tasks", "Tasks", "tasks"),
+    profile("profile-slash", "Slash", "a/b"),
+    profile("profile-shifra-2", "Second Shifra", "shifra"),
+  ];
+
+  it("keeps the first profile with each servable slug", () => {
+    expect(servableProfiles(mixed).map((p) => p.id)).toEqual(["profile-shifra", "profile-alex"]);
+  });
+
+  it("names why each other profile gets no page", () => {
+    expect(unservableProfiles(mixed).map((row) => [row.title, row.url, row.reason])).toEqual([
+      ["Tasks", "", 'Slug "tasks" is reserved for the web service'],
+      ["Slash", "", 'Slug "a/b" contains "/"'],
+      ["Second Shifra", "", 'Slug "shifra" is already used by another profile'],
+    ]);
   });
 });
 
