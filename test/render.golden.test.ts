@@ -5,7 +5,7 @@
 // the whitespace.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterAll, beforeAll, expect, it, vi } from "vitest";
+import { expect, it } from "vitest";
 import { toCard } from "../src/links.js";
 import { renderPage } from "../src/render.js";
 import { PROFILES, TAGLINE } from "../scripts/placeholder.js";
@@ -23,15 +23,6 @@ const GOLDEN_FIXTURES: Record<string, string[]> = {
   graham: ["graham.html"],
 };
 
-beforeAll(() => {
-  vi.useFakeTimers();
-  vi.setSystemTime(new Date(`${GOLDEN_YEAR}-06-15T00:00:00Z`));
-});
-
-afterAll(() => {
-  vi.useRealTimers();
-});
-
 const cases = PROFILES.flatMap((profile) =>
   (GOLDEN_FIXTURES[profile.slug] ?? []).map((fixture) => [profile.slug, fixture] as const),
 );
@@ -40,11 +31,14 @@ it.each(cases)("reproduces %s as %s byte for byte", (slug, fixture) => {
   const profile = PROFILES.find((p) => p.slug === slug);
   if (!profile) throw new Error(`no seed profile ${slug}`);
 
-  const html = renderPage({
-    name: profile.name,
-    tagline: TAGLINE,
-    cards: profile.links.map((link) => toCard(link, link.description)),
-  });
+  const html = renderPage(
+    {
+      name: profile.name,
+      tagline: TAGLINE,
+      cards: profile.links.map((link) => toCard(link, link.description)),
+    },
+    GOLDEN_YEAR,
+  );
 
   expect(html).toBe(readFileSync(join(GOLDEN, fixture), "utf8"));
 });

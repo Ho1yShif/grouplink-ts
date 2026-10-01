@@ -1,11 +1,11 @@
 // The whole page. One function, one string, no framework and no build step —
-// grouplink.rebuild commits whatever this returns as site/index.html. The CSS and
+// the web service serves whatever this returns for each profile. The CSS and
 // the one inline script live in styles.ts.
 //
 // The page carries its own Content-Security-Policy, with the inline style and
 // script blocks allowed by hash. Adding either one anywhere but STYLES or
 // ICON_FALLBACK_SCRIPT will be blocked by the browser. The policy is a meta tag
-// rather than a render.yaml header so the hashes cannot drift from the content
+// rather than a response header so the hashes cannot drift from the content
 // they cover.
 import { createHash } from "node:crypto";
 import type { IconName } from "./icons.js";
@@ -21,7 +21,7 @@ export interface LinkCard {
   description: string;
   /** `<origin>/favicon.ico`, hidden on error. */
   iconUrl: string;
-  /** Which file under site/assets/link-icons the card draws in its left column. */
+  /** Which file under assets/link-icons the card draws in its left column. */
   icon: IconName;
 }
 
@@ -136,7 +136,7 @@ const LOGO_HREF = "https://dashboard.render.com/";
 
 /**
  * The masthead's icon row. It is the same on every page and does not come from
- * Notion. Each label needs a matching file under site/assets/icons and a
+ * Notion. Each label needs a matching file under assets/icons and a
  * .social__icon--<label> rule in styles.ts.
  */
 const SOCIALS: SocialLink[] = [
@@ -154,8 +154,11 @@ function renderSocial(social: SocialLink): string {
   return `        <a class="social" href="${href}" aria-label="${label}"><span class="social__icon social__icon--${icon}"></span></a>`;
 }
 
-export function renderPage(model: PageModel): string {
-  const year = new Date().getFullYear();
+/**
+ * `year` is the footer's copyright year. Taking it as an argument lets the web
+ * service cache a page per year and keeps the golden test stable across a new year.
+ */
+export function renderPage(model: PageModel, year = new Date().getFullYear()): string {
   const taglineText = model.tagline.replace(/\s*\r?\n\s*/g, " ").trim();
   const cards = model.cards.map(renderCard).join("\n");
   const socialsBlock = `      <nav class="socials" aria-label="Social">
