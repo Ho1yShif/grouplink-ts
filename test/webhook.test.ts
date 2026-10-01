@@ -86,6 +86,68 @@ describe("createApp", () => {
     const response = await post(app, "/webhooks/notion", "x".repeat(MAX_BODY_BYTES + 1));
     expect(response.status).toBe(413);
   });
+
+  it("refuses a body over the limit by content-length, without reading it", async () => {
+    const { app } = receiver();
+    let pulls = 0;
+    let sent = 0;
+    const chunkSize = 65_536;
+    const chunks = Math.ceil((MAX_BODY_BYTES + 1) / chunkSize);
+    const body = new ReadableStream({
+      pull(controller) {
+        pulls += 1;
+        if (sent >= chunks) {
+          controller.close();
+          return;
+        }
+        sent += 1;
+        controller.enqueue(new TextEncoder().encode("x".repeat(chunkSize)));
+      },
+    });
+    const response = await app.request("/webhooks/notion", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "content-length": String(MAX_BODY_BYTES + 1),
+      },
+      body,
+      duplex: "half",
+    });
+
+    expect(response.status).toBe(413);
+    expect(pulls).toBeLessThanOrEqual(1);
+  }, 10_000);
+
+  it("stops reading a streamed body near the limit when content-length is absent", async () => {
+    const { app } = receiver();
+    let pulls = 0;
+    let sent = 0;
+    const chunk = new TextEncoder().encode("x".repeat(1024));
+    // Bounded well past the limit, so the stream always ends even if something reads
+    // the whole thing instead of stopping at the limit.
+    const chunks = Math.ceil((MAX_BODY_BYTES + 1) / chunk.length) + 5;
+    const body = new ReadableStream({
+      pull(controller) {
+        pulls += 1;
+        if (sent >= chunks) {
+          controller.close();
+          return;
+        }
+        sent += 1;
+        controller.enqueue(chunk);
+      },
+    });
+    const response = await app.request("/webhooks/notion", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body,
+      duplex: "half",
+    });
+
+    expect(response.status).toBe(413);
+    // A couple of pulls past the limit is the stream's own read-ahead buffer.
+    expect(pulls).toBeLessThanOrEqual(Math.ceil(MAX_BODY_BYTES / chunk.length) + 2);
+  }, 10_000);
 });
 
 describe("buildApp", () => {
