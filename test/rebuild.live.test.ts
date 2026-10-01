@@ -2,7 +2,7 @@
 // secrets, run via `pnpm test:live`. Never gates `pnpm test`.
 //
 // Requires every variable in REQUIRED below. Runs in dry-run, so it reads Notion,
-// scrapes, caches, and health-checks without committing or deploying anything.
+// scrapes, and health-checks without writing a snapshot to Key Value.
 import { localCtx } from "@render-lab/test-utils";
 import { describe, expect, it } from "vitest";
 import { rebuild } from "../src/rebuild.js";

@@ -16,9 +16,9 @@ const GOLDEN = join(import.meta.dirname, "golden");
 // not go stale on 1 January.
 const GOLDEN_YEAR = 2026;
 
-// The fixture each seed profile's page is committed as. The web service serves
-// the default profile at / and at /shifra, so index.html and shifra.html hold the
-// same bytes.
+// The fixture file each seed profile's page is checked against. The web service
+// serves the default profile at / and at /shifra, so index.html and shifra.html
+// hold the same bytes.
 const GOLDEN_FIXTURES: Record<string, string[]> = {
   shifra: ["index.html", "shifra.html"],
   graham: ["graham.html"],

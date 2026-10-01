@@ -3,9 +3,9 @@
 // have to import the other.
 //
 // `new URL` would answer most of these, but it accepts strings the Python
-// implementation rejects — `http:example.com` parses there and not here. The
-// two builds commit the same site/index.html, so they agree on the string
-// tests instead.
+// implementation rejects — `http:example.com` parses there and not here. Both
+// ports render the same pages to byte-identical HTML, so they agree on the
+// string tests instead.
 
 const MAILTO = "mailto:";
 

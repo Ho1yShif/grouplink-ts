@@ -255,10 +255,11 @@ is cached for one year. A page response has `Cache-Control: no-cache` and an
 not change.
 
 Until the first run writes the snapshot, a page request gets a 503 with
-`Retry-After: 60`. The service also starts one `grouplink.rebuild`, and starts
-another every 10 minutes while the key is still missing. If Key Value is down or
-the snapshot does not parse, the service serves its last good copy from memory.
-It answers 503 if it has no copy.
+`Retry-After: 60`. The service also starts one `grouplink.rebuild`. If the key
+is still missing, a request 10 minutes or more after the last attempt starts
+another rebuild. If Key Value is down or the snapshot does not parse, the
+service serves its last good copy from memory. It answers 503 if it has no
+copy.
 
 ### Reserved slugs
 
