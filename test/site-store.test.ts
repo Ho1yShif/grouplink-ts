@@ -1,10 +1,19 @@
 // The web service's copy of the site: the last good snapshot, the render cache,
 // and the rebuild it starts when the key is missing.
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PageModel } from "../src/render.js";
 import { renderPage } from "../src/render.js";
 import { createSiteStore, REBUILD_RETRY_MS } from "../src/site-store.js";
 import { buildSnapshot } from "../src/snapshot.js";
+
+// Spies on renderPage while still calling the real implementation, so a test can
+// check how many times a page was rendered without losing the real output.
+vi.mock("../src/render.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/render.js")>();
+  return { ...actual, renderPage: vi.fn(actual.renderPage) };
+});
+
+const renderPageSpy = vi.mocked(renderPage);
 
 const SHIFRA: PageModel = { name: "Shifra Williams", tagline: "DevRel.", cards: [] };
 const ALEX: PageModel = { name: "Alex Rivera", tagline: "Engineer.", cards: [] };
@@ -24,14 +33,33 @@ function snapshot(shifra = SHIFRA): string {
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 
 describe("createSiteStore", () => {
-  it("renders a page once per snapshot and year", async () => {
-    const store = createSiteStore({ read: async () => snapshot(), rebuild: async () => {} });
-    const current = await store.snapshot();
-    if (!current) throw new Error("no snapshot");
+  afterEach(() => {
+    renderPageSpy.mockClear();
+  });
 
-    expect(store.page(current, "alex", 2026)).toBe(renderPage(ALEX, 2026));
-    expect(store.page(current, "alex", 2026)).toBe(store.page(current, "alex", 2026));
-    expect(store.page(current, "nobody", 2026)).toBeNull();
+  it("renders a page once per snapshot and year", async () => {
+    let raw = snapshot();
+    const store = createSiteStore({ read: async () => raw, rebuild: async () => {} });
+    const first = await store.snapshot();
+    if (!first) throw new Error("no snapshot");
+
+    const html = store.page(first, "alex", 2026);
+    expect(html).toBe(renderPage(ALEX, 2026));
+    expect(store.page(first, "alex", 2026)).toBe(html);
+    expect(store.page(first, "nobody", 2026)).toBeNull();
+    // The 2026 call above and the manual renderPage check each render once.
+    expect(renderPageSpy).toHaveBeenCalledTimes(2);
+
+    renderPageSpy.mockClear();
+    store.page(first, "alex", 2027);
+    expect(renderPageSpy).toHaveBeenCalledTimes(1);
+
+    renderPageSpy.mockClear();
+    raw = snapshot(ALEX);
+    const second = await store.snapshot();
+    if (!second) throw new Error("no snapshot");
+    store.page(second, "alex", 2026);
+    expect(renderPageSpy).toHaveBeenCalledTimes(1);
   });
 
   it("serves the last good copy when Key Value fails", async () => {
