@@ -1,13 +1,11 @@
-// Regenerates the pages under site/ from seed links, with the descriptions the
-// scrape finds in production written out by hand.
-// The workflow overwrites these files on its first real run; they exist so the
-// static site has something to serve before then, and so the local preview has the
-// same shape as production: one page per profile, plus a copy of the default
-// profile's page at the root. Run with `pnpm placeholder`.
+// Write a seed snapshot to a local Redis, from seed links with the descriptions
+// the scrape finds in production written out by hand. It lets you run the web
+// service locally without Notion. The golden page tests render the same seed
+// links. Run with `pnpm placeholder`.
 import { pathToFileURL } from "node:url";
 import type { IconName } from "../src/icons.js";
 import { toCard } from "../src/links.js";
-import { writePages } from "./write-pages.js";
+import { writeSnapshot } from "./local-site.js";
 
 export interface SeedProfile {
   name: string;
@@ -66,20 +64,23 @@ export const PROFILES: SeedProfile[] = [
 export const DEFAULT_SLUG = "shifra";
 export const TAGLINE = "The fastest path to production for full-stack applications and agents";
 
-export function main(): void {
-  for (const profile of PROFILES) {
-    writePages(
-      {
-        name: profile.name,
-        tagline: TAGLINE,
-        cards: profile.links.map((link) => toCard(link, link.description)),
-      },
-      { slug: profile.slug, defaultSlug: DEFAULT_SLUG },
-    );
-  }
+export async function main(): Promise<void> {
+  await writeSnapshot(
+    new Map(
+      PROFILES.map((profile) => [
+        profile.slug,
+        {
+          name: profile.name,
+          tagline: TAGLINE,
+          cards: profile.links.map((link) => toCard(link, link.description)),
+        },
+      ]),
+    ),
+    DEFAULT_SLUG,
+  );
 }
 
 // Only write when run as the entry point, so a test can import the seed data.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main();
+  await main();
 }

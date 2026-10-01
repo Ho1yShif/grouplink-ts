@@ -1,17 +1,14 @@
-// Renders every profile's page from the real Notion databases and writes them into
-// site/, so a local static server can serve the same HTML the workflow commits.
-// Run with `pnpm preview`.
-//
-// This is the read half of grouplink.rebuild: Notion and the scrape, no Key Value,
-// no GitHub, no deploy. It overwrites the tracked files under site/ — `git checkout
-// -- site && git clean -fd site` puts them back.
+// Build the snapshot from the real Notion databases and write it to a local Redis,
+// so a local web service serves the same pages as production. Run with
+// `pnpm preview`. This is the read half of grouplink.rebuild: Notion and the
+// scrape, with no metadata cache, no health check, and no Slack post.
 import { localCtx } from "@render-lab/test-utils";
 import { extractPageMetadata } from "@render-lab/tasks-scrape";
 import { mapInBatches } from "../src/batch.js";
 import { loadConfig } from "../src/config.js";
 import { cardDescription, fetchableUrls, toPageModel, uniqueUrls } from "../src/links.js";
 import { readNotionSite } from "../src/read-notion.js";
-import { writePages } from "./write-pages.js";
+import { writeSnapshot } from "./local-site.js";
 
 const ctx = localCtx();
 const cfg = loadConfig({ dryRun: true });
@@ -24,9 +21,12 @@ const cardUrls = fetchableUrls(uniqueUrls(pages.flatMap((page) => page.rows)));
 const scraped = await mapInBatches(cardUrls, (url) => ctx.run(extractPageMetadata, { url }));
 const descriptions = new Map(cardUrls.map((url, i) => [url, cardDescription(scraped[i] ?? {})]));
 
-for (const page of pages) {
-  writePages(
-    toPageModel(page, (url) => descriptions.get(url) ?? ""),
-    { slug: page.profile.slug, defaultSlug: cfg.defaultSlug },
-  );
-}
+await writeSnapshot(
+  new Map(
+    pages.map((page) => [
+      page.profile.slug,
+      toPageModel(page, (url) => descriptions.get(url) ?? ""),
+    ]),
+  ),
+  cfg.defaultSlug,
+);
