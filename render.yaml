@@ -23,6 +23,9 @@ projects:
             buildCommand: pnpm install --frozen-lockfile && pnpm build
             startCommand: node dist/webhook.js
             healthCheckPath: /healthz
+            # One instance. The debounce timer and the missing-key retry live in
+            # memory, so a second instance would start duplicate runs.
+            numInstances: 1
             autoDeployTrigger: commit
             envVars:
               - key: RENDER_API_KEY
