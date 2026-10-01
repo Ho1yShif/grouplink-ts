@@ -22,7 +22,10 @@ export interface NotionSite {
   /** The raw link rows, which the skip report reads. */
   linkPages: PageDTO[];
   profiles: ProfileRow[];
-  /** One page per profile whose slug the web service can serve. Each page holds its visible rows, in `Order`. */
+  /**
+   * One page per profile whose slug the web service can serve. Each page holds its
+   * visible rows, in `Order`.
+   */
   pages: ProfilePage[];
 }
 
