@@ -1,4 +1,5 @@
 // The page routes of the web service: the snapshot in Key Value, rendered per request.
+import { fromPartial } from "@total-typescript/shoehorn";
 import { describe, expect, it } from "vitest";
 import { createNotionWebhook } from "../src/notion-webhook.js";
 import { renderPage, type PageModel } from "../src/render.js";
@@ -50,8 +51,7 @@ function server(value: string | null = snapshot()) {
   });
   const app = createApp({
     workflowSlug: "grouplink",
-    // The dispatch server only ever calls start on this.
-    dispatcher: { start: dispatch } as never,
+    dispatcher: fromPartial({ start: dispatch }),
     handle: createNotionWebhook({ dispatch, task: "grouplink.rebuild" }),
     store,
   });

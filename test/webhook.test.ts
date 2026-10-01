@@ -1,5 +1,6 @@
 // The non-page routes of the web service: POST /webhooks/notion, and the routes it
 // delegates to the @render-lab/triggers dispatch server.
+import { fromPartial } from "@total-typescript/shoehorn";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createNotionWebhook } from "../src/notion-webhook.js";
 import { createSiteStore } from "../src/site-store.js";
@@ -14,8 +15,7 @@ function receiver() {
   const app = createApp({
     workflowSlug: "grouplink",
     handle: createNotionWebhook({ dispatch, task: "grouplink.rebuild" }),
-    // The dispatch server only ever calls start on this.
-    dispatcher: { start: dispatch } as never,
+    dispatcher: fromPartial({ start: dispatch }),
     store: createSiteStore({ read: async () => null, rebuild: async () => {} }),
   });
   return { app, calls };
