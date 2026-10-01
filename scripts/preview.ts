@@ -27,6 +27,6 @@ const descriptions = new Map(cardUrls.map((url, i) => [url, cardDescription(scra
 for (const page of pages) {
   writePages(
     toPageModel(page, (url) => descriptions.get(url) ?? ""),
-    { siteDir: cfg.siteDir, slug: page.profile.slug, defaultSlug: cfg.defaultSlug },
+    { slug: page.profile.slug, defaultSlug: cfg.defaultSlug },
   );
 }

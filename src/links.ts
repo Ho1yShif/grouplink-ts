@@ -236,21 +236,6 @@ export function fetchableUrls(urls: string[]): string[] {
   return urls.filter(isHttpUrl);
 }
 
-/** The default profile is the root page; every other profile lives under its slug. */
-function pagePath(siteDir: string, slug: string): string {
-  return slug ? `${siteDir}/${slug}/index.html` : `${siteDir}/index.html`;
-}
-
-/**
- * Every path one profile's page is written to. The default profile gets a second
- * copy at the site root, so `/` and `/<default slug>` serve the same bytes.
- */
-export function pagePathsFor(siteDir: string, slug: string, defaultSlug: string): string[] {
-  const paths = [pagePath(siteDir, slug)];
-  if (slug === defaultSlug) paths.push(pagePath(siteDir, ""));
-  return paths;
-}
-
 /**
  * A default slug that matches no profile would publish a site with no root page,
  * so every caller that renders pages checks it before it renders anything.

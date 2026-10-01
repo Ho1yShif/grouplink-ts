@@ -1,5 +1,5 @@
 // grouplink.rebuild — read the profiles and their links from Notion, enrich them,
-// render one page each, commit the pages that changed, deploy, and say so in Slack.
+// write the site to Key Value for the web service to serve, and say so in Slack.
 //
 // Every `await ctx.run(...)` below is a separate durable run on its own instance,
 // with that package's retry policy, tracked in the dashboard. The per-URL stages fan
@@ -10,28 +10,25 @@ import type { PageDTO } from "@render-lab/tasks-notion";
 import { extractPageMetadata } from "@render-lab/tasks-scrape";
 import { get as kvGet, set as kvSet } from "@render-lab/tasks-render-kv";
 import { request } from "@render-lab/tasks-http";
-import { commitFiles, getFileContents, listTree } from "@render-lab/tasks-github";
-import { triggerDeploy, awaitDeploy } from "@render-lab/tasks-render";
 import { postMessage } from "@render-lab/tasks-slack";
 
 import { mapInBatches } from "./batch.js";
-import { assertWritable, loadConfig, type RebuildConfig, type RebuildInput } from "./config.js";
+import { loadConfig, type RebuildConfig, type RebuildInput } from "./config.js";
 import { DEFAULT_ICON } from "./icons.js";
 import {
   cardDescription,
   fetchableUrls,
   metaCacheKey,
-  pagePathsFor,
   skippedRows,
   toPageModel,
   uniqueUrls,
   unknownIcons,
-  type ProfilePage,
+  unservableProfiles,
   type ProfileRow,
   type SkippedRow,
 } from "./links.js";
 import { readNotionSite } from "./read-notion.js";
-import { renderPage } from "./render.js";
+import { SITE_KEY, buildSnapshot, parseSnapshot } from "./snapshot.js";
 
 /** The subset of scrape.extractMetadata we cache and use. */
 interface CachedMeta {
@@ -44,13 +41,8 @@ interface CachedMeta {
  */
 const REFUSED_STATUSES = new Set([401, 403, 405, 429, 999]);
 
-interface SiteFile {
-  path: string;
-  content: string;
-}
-
 export interface RebuildResult {
-  /** Profiles rendered. The root page is a second copy, not another page. */
+  /** Profiles in the snapshot. */
   pageCount: number;
   /** Distinct card URLs across every page. */
   linkCount: number;
@@ -58,11 +50,10 @@ export interface RebuildResult {
   /** Link rows read from Notion that render on no page, and why. */
   skipped: SkippedRow[];
   deadLinks: string[];
-  committed: boolean;
-  /** Paths in the commit. Empty when nothing changed. */
-  changedPaths: string[];
-  commitSha: string | null;
-  deployId: string | null;
+  /** sha256 of the snapshot's pages and default slug. */
+  hash: string;
+  /** Whether the run wrote a new snapshot to Key Value. */
+  published: boolean;
   siteUrl: string;
   dryRun: boolean;
 }
@@ -101,9 +92,16 @@ async function runRebuild(ctx: TaskContext, input: RebuildInput): Promise<Rebuil
   // 3) Batched fan-out: health-check every link.
   const deadLinks = await findDeadLinks(ctx, webUrls);
 
-  // 4) Render one file per profile, plus a second copy of the default profile's page
-  //    at the site root.
-  const files = renderFiles(pages, metaByUrl, cfg);
+  // 4) Build the snapshot the web service serves: every profile's page model and
+  //    the slug the root page shows.
+  const models = new Map(
+    pages.map((page) => [
+      page.profile.slug,
+      toPageModel(page, (url) => metaByUrl.get(url)?.description ?? ""),
+    ]),
+  );
+  const snapshot = buildSnapshot(models, cfg.defaultSlug, new Date());
+  const hash = parseSnapshot(snapshot).hash;
 
   const result: RebuildResult = {
     pageCount: pages.length,
@@ -111,24 +109,20 @@ async function runRebuild(ctx: TaskContext, input: RebuildInput): Promise<Rebuil
     cacheHits,
     skipped,
     deadLinks,
-    committed: false,
-    changedPaths: [],
-    commitSha: null,
-    deployId: null,
+    hash,
+    published: false,
     siteUrl: cfg.siteUrl,
     dryRun: cfg.dryRun,
   };
 
   // Dry-run lives here in the caller, not in the packs.
   if (cfg.dryRun) return result;
-  assertWritable(cfg);
 
-  // 5) Chained run, then a batched fan-out: compare each page against what the
-  //    branch already holds, so a quiet day produces no commit and no deploy.
-  const changed = await changedFiles(ctx, files, cfg);
-  result.changedPaths = changed.map((file) => file.path);
-
-  if (changed.length === 0) {
+  // 5) Chained runs: read the published snapshot, and write the new one only when
+  //    its hash differs. One SET, so a reader never sees half of a rebuild. No TTL,
+  //    so Key Value never evicts it. The page is live when the SET returns.
+  const current = await ctx.run(kvGet, { key: SITE_KEY });
+  if (snapshotHash(current.value) === hash) {
     // A quiet day is not worth a Slack message. A broken link is.
     if (deadLinks.length > 0) {
       await notify(ctx, "grouplink is unchanged, but some links are unreachable.", deadLinks);
@@ -136,29 +130,10 @@ async function runRebuild(ctx: TaskContext, input: RebuildInput): Promise<Rebuil
     return result;
   }
 
-  // 6) Chained run: every changed page in one commit, so one deploy covers them all.
-  const commit = await ctx.run(commitFiles, {
-    owner: cfg.repoOwner,
-    repo: cfg.repoName,
-    branch: cfg.branch,
-    message: `chore(site): rebuild ${changed.length} page(s) (${cardUrls.length} links)`,
-    files: changed,
-  });
-  result.committed = true;
-  result.commitSha = commit.commitSha;
+  await ctx.run(kvSet, { key: SITE_KEY, value: snapshot });
+  result.published = true;
 
-  // 7) Chained runs: deploy the static site and wait for it to go live.
-  const deploy = await ctx.run(triggerDeploy, {
-    serviceId: cfg.staticSiteId,
-    commitId: commit.commitSha,
-  });
-  result.deployId = deploy.deployId;
-  await ctx.run(awaitDeploy, {
-    serviceId: cfg.staticSiteId,
-    deployId: deploy.deployId,
-  });
-
-  // 8) Chained run: post the outcome.
+  // 6) Chained run: post the outcome.
   await notify(
     ctx,
     `grouplink is live with ${cardUrls.length} links across ${pages.length} pages. ${cfg.siteUrl}`,
@@ -173,7 +148,7 @@ async function runRebuild(ctx: TaskContext, input: RebuildInput): Promise<Rebuil
  * Returns the skipped rows, which the run reports as part of its result.
  */
 function reportNotionProblems(linkPages: PageDTO[], profiles: ProfileRow[]): SkippedRow[] {
-  const skipped = skippedRows(linkPages, profiles);
+  const skipped = [...skippedRows(linkPages, profiles), ...unservableProfiles(profiles)];
   for (const row of skipped) {
     console.log(`skipped "${row.title}": ${row.reason}`);
   }
@@ -232,41 +207,14 @@ async function findDeadLinks(ctx: TaskContext, urls: string[]): Promise<string[]
     .map(({ url, check }) => `${url} (${check?.status ?? "no response"})`);
 }
 
-/** One file per profile, plus the default profile's page again at the site root. */
-function renderFiles(
-  pages: ProfilePage[],
-  metaByUrl: Map<string, CachedMeta>,
-  cfg: RebuildConfig,
-): SiteFile[] {
-  return pages.flatMap((page) => {
-    const content = renderPage(toPageModel(page, (url) => metaByUrl.get(url)?.description ?? ""));
-    return pagePathsFor(cfg.siteDir, page.profile.slug, cfg.defaultSlug).map((path) => ({
-      path,
-      content,
-    }));
-  });
-}
-
-/**
- * The files whose content differs from the branch. listTree comes first because
- * getFileContents throws a 404 on a path that doesn't exist yet, and a new
- * profile's page never does.
- */
-async function changedFiles(
-  ctx: TaskContext,
-  files: SiteFile[],
-  cfg: RebuildConfig,
-): Promise<SiteFile[]> {
-  const repo = `${cfg.repoOwner}/${cfg.repoName}`;
-  const tree = await ctx.run(listTree, { repo, ref: cfg.branch });
-  const onBranch = new Set(tree.paths);
-  const existing = files.filter((file) => onBranch.has(file.path));
-  const currents = await mapInBatches(existing, (file) =>
-    ctx.run(getFileContents, { repo, path: file.path, ref: cfg.branch }),
-  );
-  const currentByPath = new Map(existing.map((file, i) => [file.path, currents[i]?.content ?? ""]));
-
-  return files.filter((file) => currentByPath.get(file.path) !== file.content);
+/** The hash of the published snapshot. null when there is none this build can read. */
+function snapshotHash(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    return parseSnapshot(value).hash;
+  } catch {
+    return null;
+  }
 }
 
 /** Never masks the error it is reporting: a failed Slack post is logged and dropped. */

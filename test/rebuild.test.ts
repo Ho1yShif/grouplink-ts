@@ -10,20 +10,17 @@ import { queryDatabaseImpl } from "@render-lab/tasks-notion";
 import { extractPageMetadataImpl } from "@render-lab/tasks-scrape";
 import { getImpl as kvGetImpl, setImpl as kvSetImpl } from "@render-lab/tasks-render-kv";
 import { requestImpl } from "@render-lab/tasks-http";
-import { commitFilesImpl, getFileContentsImpl, listTreeImpl } from "@render-lab/tasks-github";
-import { triggerDeployImpl, awaitDeployImpl } from "@render-lab/tasks-render";
 import { postMessageImpl } from "@render-lab/tasks-slack";
 
 import { LINK_SORTS } from "../src/links.js";
 import { rebuild } from "../src/rebuild.js";
+import { renderPage } from "../src/render.js";
+import { SITE_KEY, parseSnapshot, type Snapshot } from "../src/snapshot.js";
 
 const ENV = {
   NOTION_LINKS_DATABASE_ID: "db_links",
   NOTION_PROFILES_DATABASE_ID: "db_profiles",
   SITE_DEFAULT_SLUG: "shifra",
-  GITHUB_REPO_OWNER: "acme",
-  GITHUB_REPO_NAME: "grouplink",
-  RENDER_STATIC_SITE_ID: "srv-1",
   SITE_URL: "https://grouplink.onrender.com",
 };
 
@@ -116,12 +113,12 @@ interface Fakes {
   cache?: Record<string, string>;
   /** URL -> status, for http.request. Defaults to 200. */
   statuses?: Record<string, number>;
-  /** Path -> contents already on the branch. Its keys are the default tree. */
-  current?: Record<string, string>;
-  /** Paths github.listTree reports, when they differ from `current`'s keys. */
-  onBranch?: string[];
   /** Raw link rows, when a case needs more or fewer than LINK_PAGES. */
   links?: ReturnType<typeof rawPage>[];
+  /** Raw profile rows, when a case needs more than PROFILE_PAGES. */
+  profiles?: ReturnType<typeof rawProfile>[];
+  /** The value already under SITE_KEY. */
+  site?: string;
 }
 
 /** The input type one task's *Impl takes, so each route below reads typed input. */
@@ -134,6 +131,8 @@ function harness(fakes: Fakes = {}) {
   const checked: string[] = [];
   /** Every notion.queryDatabase input, in call order. */
   const queries: Input<typeof queryDatabaseImpl>[] = [];
+  /** Every task name a run calls, in call order. */
+  const tasks: string[] = [];
 
   const scrapeFetch = vi.fn(async (url: string) => {
     inFlight += 1;
@@ -149,30 +148,13 @@ function harness(fakes: Fakes = {}) {
     };
   });
   const kvSet = vi.fn(async (_k: string, _v: string, _ttl?: number) => {});
-  // Typed with the arguments tasks-github passes them, so the assertions below can
-  // read the committed blobs and tree without casting the recorded call.
-  const createBlob = vi.fn(async (_owner: string, _repo: string, _input: { content: string }) => ({
-    sha: "blob1",
-  }));
-  const createTree = vi.fn(
-    async (_owner: string, _repo: string, _input: { tree: Array<{ path: string }> }) => ({
-      sha: "tree1",
-    }),
-  );
-  const createCommit = vi.fn(async () => ({ sha: "commit1" }));
-  const updateRef = vi.fn(async () => {});
   const slackPost = vi.fn(async () => true);
-  const triggerDeployPort = vi.fn(async () => ({
-    id: "dep-1",
-    serviceId: "srv-1",
-    status: "created" as const,
-    commitId: "commit1",
-    createdAt: "",
-    finishedAt: null,
-  }));
 
   const kv = {
-    get: async (key: string) => fakes.cache?.[key.replace("gl:meta:v1:", "")] ?? null,
+    get: async (key: string) =>
+      key === SITE_KEY
+        ? (fakes.site ?? null)
+        : (fakes.cache?.[key.replace("gl:meta:v1:", "")] ?? null),
     set: kvSet,
   };
 
@@ -184,7 +166,10 @@ function harness(fakes: Fakes = {}) {
   const routes = {
     "notion.queryDatabase": (input: Input<typeof queryDatabaseImpl>) => {
       queries.push(input);
-      const rows = input.databaseId === "db_profiles" ? PROFILE_PAGES : (fakes.links ?? LINK_PAGES);
+      const rows =
+        input.databaseId === "db_profiles"
+          ? (fakes.profiles ?? PROFILE_PAGES)
+          : (fakes.links ?? LINK_PAGES);
       return queryDatabaseImpl(
         ctx,
         input,
@@ -213,73 +198,13 @@ function harness(fakes: Fakes = {}) {
         }),
       );
     },
-    "github.listTree": (input: Input<typeof listTreeImpl>) =>
-      listTreeImpl(
-        ctx,
-        input,
-        fromPartial({
-          github: {
-            listTree: async () => ({
-              paths: fakes.onBranch ?? Object.keys(fakes.current ?? {}),
-              truncated: false,
-            }),
-          },
-        }),
-      ),
-    "github.getFileContents": (input: Input<typeof getFileContentsImpl>) =>
-      getFileContentsImpl(
-        ctx,
-        input,
-        fromPartial({
-          github: {
-            getFileContents: async () => ({
-              path: input.path,
-              content: fakes.current?.[input.path] ?? "<html>stale</html>",
-              sha: "sha1",
-              encoding: "utf-8" as const,
-            }),
-          },
-        }),
-      ),
-    "github.commitFiles": (input: Input<typeof commitFilesImpl>) =>
-      commitFilesImpl(
-        ctx,
-        input,
-        fromPartial({
-          github: {
-            getRef: async () => ({ sha: "head1", treeSha: "tree0" }),
-            createBlob,
-            createTree,
-            createCommit,
-            updateRef,
-          },
-        }),
-      ),
-    "render.triggerDeploy": (input: Input<typeof triggerDeployImpl>) =>
-      triggerDeployImpl(ctx, input, fromPartial({ render: { triggerDeploy: triggerDeployPort } })),
-    "render.awaitDeploy": (input: Input<typeof awaitDeployImpl>) =>
-      awaitDeployImpl(
-        ctx,
-        input,
-        fromPartial({
-          render: {
-            getDeploy: async () => ({
-              id: "dep-1",
-              serviceId: "srv-1",
-              status: "live" as const,
-              commitId: "commit1",
-              createdAt: "",
-              finishedAt: "",
-            }),
-          },
-        }),
-      ),
     "slack.postMessage": (input: Input<typeof postMessageImpl>) =>
       postMessageImpl(ctx, input, fromPartial({ slack: { post: slackPost } })),
   };
 
   const ctx: TaskContext = fromPartial({
     run: async (taskDef: { name?: string }, ...args: unknown[]) => {
+      tasks.push(taskDef?.name ?? "");
       // The one unchecked step: ctx.run is generic over every task, so the routes
       // are keyed by name and the input arrives as unknown.
       const route = routes[(taskDef?.name ?? "") as keyof typeof routes] as
@@ -290,30 +215,35 @@ function harness(fakes: Fakes = {}) {
     },
   });
 
-  /** Path -> HTML handed to github.commitFiles on the last run. */
-  const committed = (): Record<string, string> => {
-    const tree = createTree.mock.calls[0]?.[2].tree ?? [];
-    const blobs = createBlob.mock.calls.map((call) => call[2].content);
-    return Object.fromEntries(tree.map((entry, i) => [entry.path, blobs[i] ?? ""]));
+  /** Every kv.set of the site key, as [key, value, ttlSeconds]. */
+  const siteSets = () => kvSet.mock.calls.filter(([key]) => key === SITE_KEY);
+
+  /** The snapshot the last run wrote. */
+  const snapshot = (): Snapshot => {
+    const value = siteSets().at(-1)?.[1];
+    if (value === undefined) throw new Error("the run wrote no snapshot");
+    return parseSnapshot(value);
   };
 
-  /** The root page's HTML. */
-  const committedHtml = (): string => committed()["site/index.html"] ?? "";
+  /** One profile's page, rendered from the snapshot the last run wrote. */
+  const html = (slug = "shifra"): string => {
+    const model = snapshot().pages.get(slug);
+    if (!model) throw new Error(`the snapshot has no page for ${slug}`);
+    return renderPage(model, 2026);
+  };
 
   return {
     ctx,
     scrapeFetch,
     checked,
     queries,
+    tasks,
     peak: () => peakInFlight,
     kvSet,
-    createBlob,
-    createTree,
-    createCommit,
     slackPost,
-    triggerDeployPort,
-    committed,
-    committedHtml,
+    siteSets,
+    snapshot,
+    html,
   };
 }
 
@@ -325,7 +255,7 @@ describe("grouplink.rebuild", () => {
     expect(result.pageCount).toBe(2);
     expect(result.linkCount).toBe(3);
 
-    const html = h.committedHtml();
+    const html = h.html();
     expect(html.indexOf("Discord")).toBeLessThan(html.indexOf("Startups"));
     expect(html).not.toContain("Hidden");
     expect(html).not.toContain("render.com/secret");
@@ -350,13 +280,12 @@ describe("grouplink.rebuild", () => {
       ],
     });
     await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
-    const files = h.committed();
 
-    const shifra = files["site/shifra/index.html"] ?? "";
+    const shifra = h.html("shifra");
     expect(shifra.indexOf("Docs")).toBeLessThan(shifra.indexOf("Mine"));
     expect(shifra.indexOf("Mine")).toBeLessThan(shifra.indexOf("Blog"));
 
-    const alex = files["site/alex/index.html"] ?? "";
+    const alex = h.html("alex");
     expect(alex).not.toContain("Mine");
     expect(alex.indexOf("Docs")).toBeLessThan(alex.indexOf("Blog"));
   });
@@ -370,8 +299,8 @@ describe("grouplink.rebuild", () => {
     });
     const result = await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
 
-    expect(result.committed).toBe(true);
-    const html = h.committedHtml();
+    expect(result.published).toBe(true);
+    const html = h.html();
     // The bare class name is in the stylesheet on every page, so match the span.
     expect(html).toContain('class="card__mark card__mark--workflows"');
     expect(html).toContain('class="card__mark card__mark--arrow"');
@@ -380,15 +309,14 @@ describe("grouplink.rebuild", () => {
   it("puts a profile's links in its own file and nobody else's", async () => {
     const h = harness();
     await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
-    const files = h.committed();
 
-    expect(files["site/shifra/index.html"]).toContain("Startups");
-    expect(files["site/shifra/index.html"]).not.toContain("Alex only");
-    expect(files["site/alex/index.html"]).toContain("Alex only");
-    expect(files["site/alex/index.html"]).not.toContain("Startups");
+    expect(h.html("shifra")).toContain("Startups");
+    expect(h.html("shifra")).not.toContain("Alex only");
+    expect(h.html("alex")).toContain("Alex only");
+    expect(h.html("alex")).not.toContain("Startups");
     // The shared link is on both.
-    expect(files["site/shifra/index.html"]).toContain("Discord");
-    expect(files["site/alex/index.html"]).toContain("Discord");
+    expect(h.html("shifra")).toContain("Discord");
+    expect(h.html("alex")).toContain("Discord");
   });
 
   it("puts an Everyone link on every page, related to nobody", async () => {
@@ -399,10 +327,9 @@ describe("grouplink.rebuild", () => {
       ],
     });
     await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
-    const files = h.committed();
 
-    expect(files["site/shifra/index.html"]).toContain("Careers");
-    expect(files["site/alex/index.html"]).toContain("Careers");
+    expect(h.html("shifra")).toContain("Careers");
+    expect(h.html("alex")).toContain("Careers");
   });
 
   it("scrapes an Everyone link once, not once per page", async () => {
@@ -423,11 +350,10 @@ describe("grouplink.rebuild", () => {
   it("gives each page its own name and tagline from the Profiles database", async () => {
     const h = harness();
     await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
-    const files = h.committed();
 
-    expect(files["site/shifra/index.html"]).toContain("Developer relations at Render.");
-    expect(files["site/alex/index.html"]).toContain("Alex Rivera");
-    expect(files["site/alex/index.html"]).not.toContain("Shifra Williams");
+    expect(h.html("shifra")).toContain("Developer relations at Render.");
+    expect(h.html("alex")).toContain("Alex Rivera");
+    expect(h.html("alex")).not.toContain("Shifra Williams");
   });
 
   it("reports why a row renders on no page", async () => {
@@ -486,7 +412,7 @@ describe("grouplink.rebuild", () => {
     expect(scraped).not.toContain("render.com/careers");
     expect(scraped).toContain("https://render.com/careers");
     expect(h.checked).toContain("https://render.com/careers");
-    expect(h.committedHtml()).toContain("Bare host");
+    expect(h.html()).toContain("Bare host");
   });
 
   it("never fetches a URL fetch refuses", async () => {
@@ -498,7 +424,7 @@ describe("grouplink.rebuild", () => {
     const scraped = h.scrapeFetch.mock.calls.map((call) => call[0]);
     expect(scraped).not.toContain("javascript:alert(1)");
     expect(h.checked).not.toContain("javascript:alert(1)");
-    expect(h.committedHtml()).not.toContain("Script");
+    expect(h.html()).not.toContain("Script");
   });
 
   it("renders a mailto: row without scraping or checking it", async () => {
@@ -511,17 +437,9 @@ describe("grouplink.rebuild", () => {
     expect(h.checked).not.toContain(address);
     expect(result.skipped.map((row) => row.title)).toEqual(["Hidden"]);
 
-    const html = h.committed()["site/shifra/index.html"] ?? "";
+    const html = h.html("shifra");
     expect(html).toContain(`href="${address}"`);
     expect(html).toContain(`<span class="card__target">${address}</span>`);
-  });
-
-  it("serves the default profile at the root, byte for byte", async () => {
-    const h = harness();
-    await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
-    const files = h.committed();
-
-    expect(files["site/index.html"]).toBe(files["site/shifra/index.html"]);
   });
 
   it("refuses to run when SITE_DEFAULT_SLUG matches nobody", async () => {
@@ -544,7 +462,7 @@ describe("grouplink.rebuild", () => {
     const h = harness();
     await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
 
-    const html = h.committed()["site/alex/index.html"] ?? "";
+    const html = h.html("alex");
     expect(html).toContain('href="/assets/render-logomark-black.svg"');
     expect(html).toContain("url('/assets/render-logo-white.png')");
     expect(html).toContain("url('/assets/icons/github.svg')");
@@ -555,13 +473,13 @@ describe("grouplink.rebuild", () => {
   it("carries the scraped description onto the card", async () => {
     const h = harness();
     await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
-    expect(h.committedHtml()).toContain("desc for https://discord.com/invite/x");
+    expect(h.html()).toContain("desc for https://discord.com/invite/x");
   });
 
   it("links to the Notion URL untouched, with no tracking parameters", async () => {
     const h = harness();
     await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
-    const html = h.committedHtml();
+    const html = h.html();
     expect(html).toContain('href="https://render.com/startups"');
     expect(html).toContain('href="https://discord.com/invite/x"');
     expect(html).not.toContain("utm_");
@@ -575,14 +493,15 @@ describe("grouplink.rebuild", () => {
 
     expect(result.cacheHits).toBe(1);
     expect(h.scrapeFetch).toHaveBeenCalledTimes(2);
-    expect(h.committedHtml()).toContain("cached blurb");
+    expect(h.html()).toContain("cached blurb");
   });
 
   it("caches every fresh scrape with a TTL", async () => {
     const h = harness();
     await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
-    expect(h.kvSet).toHaveBeenCalledTimes(3);
-    expect(h.kvSet.mock.calls[0]?.[2]).toBe(604_800);
+    const calls = h.kvSet.mock.calls.filter(([key]) => key !== SITE_KEY);
+    expect(calls).toHaveLength(3);
+    expect(calls[0]?.[2]).toBe(604_800);
   });
 
   it("reports unreachable links", async () => {
@@ -591,70 +510,93 @@ describe("grouplink.rebuild", () => {
     expect(result.deadLinks).toEqual(["https://render.com/startups (404)"]);
   });
 
-  it("commits every page once, deploys, and posts on a real run", async () => {
+  it("publishes and posts that the site is live", async () => {
     const h = harness();
     const result = await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
 
-    expect(result.committed).toBe(true);
-    expect(result.changedPaths).toEqual([
-      "site/shifra/index.html",
-      "site/index.html",
-      "site/alex/index.html",
-    ]);
-    expect(result.commitSha).toBe("commit1");
-    expect(result.deployId).toBe("dep-1");
-    expect(h.createCommit).toHaveBeenCalledTimes(1);
-    expect(h.triggerDeployPort).toHaveBeenCalledTimes(1);
+    expect(result.published).toBe(true);
     expect(h.slackPost).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(h.slackPost.mock.calls[0])).toContain(
+      "grouplink is live with 3 links across 2 pages.",
+    );
   });
 
-  it("leaves an unchanged page out of the commit", async () => {
+  it("never calls GitHub or the Render API", async () => {
+    const h = harness();
+    const result = await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
+
+    expect(h.tasks.filter((name) => /^(github|render)\./.test(name))).toEqual([]);
+    for (const key of ["committed", "commitSha", "deployId", "changedPaths"]) {
+      expect(result).not.toHaveProperty(key);
+    }
+  });
+
+  it("writes the site to Key Value once, with no TTL", async () => {
+    const h = harness();
+    const result = await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
+
+    expect(h.siteSets()).toHaveLength(1);
+    expect(h.siteSets()[0]?.[2]).toBeUndefined();
+    const snapshot = h.snapshot();
+    expect(snapshot.defaultSlug).toBe("shifra");
+    expect([...snapshot.pages.keys()]).toEqual(["shifra", "alex"]);
+    expect(snapshot.pages.get("alex")?.name).toBe("Alex Rivera");
+    expect(snapshot.pages.get("shifra")?.cards.map((card) => card.title)).toEqual([
+      "Discord",
+      "Startups",
+    ]);
+    expect(result.hash).toBe(snapshot.hash);
+  });
+
+  it("skips the site write when the hash matches", async () => {
     const first = harness();
     await withEnv({ DRY_RUN: "false" }, () => rebuild.func(first.ctx, {}));
-    const rendered = first.committed();
 
-    // Alex's page is already on the branch and unchanged; Shifra's is stale.
-    const second = harness({
-      current: {
-        "site/alex/index.html": rendered["site/alex/index.html"] ?? "",
-        "site/shifra/index.html": "<html>old</html>",
-        "site/index.html": "<html>old</html>",
-      },
+    const second = harness({ site: first.siteSets()[0]?.[1] });
+    const result = await withEnv({ DRY_RUN: "false" }, () => rebuild.func(second.ctx, {}));
+
+    expect(second.siteSets()).toEqual([]);
+    expect(result.published).toBe(false);
+    expect(second.slackPost).not.toHaveBeenCalled();
+  });
+
+  it("posts dead links even when the site is unchanged", async () => {
+    const statuses = { "https://render.com/startups": 404 };
+    const first = harness({ statuses });
+    await withEnv({ DRY_RUN: "false" }, () => rebuild.func(first.ctx, {}));
+
+    const second = harness({ site: first.siteSets()[0]?.[1], statuses });
+    await withEnv({ DRY_RUN: "false" }, () => rebuild.func(second.ctx, {}));
+
+    const text = JSON.stringify(second.slackPost.mock.calls[0]);
+    expect(second.slackPost).toHaveBeenCalledTimes(1);
+    expect(text).toContain("unchanged");
+    expect(text).toContain("https://render.com/startups (404)");
+  });
+
+  it("overwrites a site value it cannot read", async () => {
+    const h = harness({ site: "not json" });
+    const result = await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
+
+    expect(h.siteSets()).toHaveLength(1);
+    expect(result.published).toBe(true);
+  });
+
+  it("skips and reports a profile with a reserved slug", async () => {
+    const h = harness({
+      profiles: [
+        ...PROFILE_PAGES,
+        rawProfile("profile-assets", "Assets", "assets", "Not a person."),
+      ],
     });
-    const result = await withEnv({ DRY_RUN: "false" }, () => rebuild.func(second.ctx, {}));
+    const result = await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
 
-    expect(result.changedPaths).toEqual(["site/shifra/index.html", "site/index.html"]);
-    expect(Object.keys(second.committed())).not.toContain("site/alex/index.html");
-  });
-
-  it("skips the commit when nothing changed", async () => {
-    const first = harness();
-    await withEnv({ DRY_RUN: "false" }, () => rebuild.func(first.ctx, {}));
-
-    const second = harness({ current: first.committed() });
-    const result = await withEnv({ DRY_RUN: "false" }, () => rebuild.func(second.ctx, {}));
-
-    expect(result.committed).toBe(false);
-    expect(result.changedPaths).toEqual([]);
-    expect(second.createCommit).not.toHaveBeenCalled();
-    expect(second.triggerDeployPort).not.toHaveBeenCalled();
-  });
-
-  it("commits a brand-new profile's page, which is not on the branch yet", async () => {
-    const first = harness();
-    await withEnv({ DRY_RUN: "false" }, () => rebuild.func(first.ctx, {}));
-    const rendered = first.committed();
-
-    // Everything is current except alex, whose file has never been committed.
-    const second = harness({
-      current: {
-        "site/shifra/index.html": rendered["site/shifra/index.html"] ?? "",
-        "site/index.html": rendered["site/index.html"] ?? "",
-      },
+    expect(h.snapshot().pages.has("assets")).toBe(false);
+    expect(result.skipped).toContainEqual({
+      title: "Assets",
+      url: "",
+      reason: 'Slug "assets" is reserved for the web service',
     });
-    const result = await withEnv({ DRY_RUN: "false" }, () => rebuild.func(second.ctx, {}));
-
-    expect(result.changedPaths).toEqual(["site/alex/index.html"]);
   });
 
   it("scrapes in batches instead of opening one run per link", async () => {
@@ -690,9 +632,9 @@ describe("grouplink.rebuild", () => {
     const result = await withEnv({ DRY_RUN: "true" }, () => rebuild.func(h.ctx, {}));
 
     expect(result.dryRun).toBe(true);
-    expect(result.committed).toBe(false);
     expect(result.linkCount).toBe(3);
-    expect(h.createCommit).not.toHaveBeenCalled();
+    expect(result.published).toBe(false);
+    expect(h.siteSets()).toEqual([]);
     expect(h.slackPost).not.toHaveBeenCalled();
   });
 });

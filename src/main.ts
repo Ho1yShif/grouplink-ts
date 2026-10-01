@@ -2,7 +2,6 @@
 //
 // Importing ./rebuild registers grouplink.rebuild AND, transitively, every task it
 // composes — notion.queryDatabase, scrape.extractMetadata, kv.get/set, http.request,
-// github.commitFiles/getFileContents, render.triggerDeploy/awaitDeploy,
 // slack.postMessage — because each package calls task(...) at module load. All of them
 // register into the one shared @renderinc/sdk TaskRegistry (the peerDependency plus
 // dedupe-peer-dependents in .npmrc guarantee a single copy), so subtask dispatch by

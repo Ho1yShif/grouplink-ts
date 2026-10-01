@@ -74,7 +74,7 @@ export function main(): void {
         tagline: TAGLINE,
         cards: profile.links.map((link) => toCard(link, link.description)),
       },
-      { siteDir: "site", slug: profile.slug, defaultSlug: DEFAULT_SLUG },
+      { slug: profile.slug, defaultSlug: DEFAULT_SLUG },
     );
   }
 }

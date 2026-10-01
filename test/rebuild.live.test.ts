@@ -29,7 +29,7 @@ describe.skipIf(!process.env.RUN_LIVE)("grouplink.rebuild (live)", () => {
     const result = await rebuild.func(localCtx(), { dryRun: true });
 
     expect(result.dryRun).toBe(true);
-    expect(result.committed).toBe(false);
+    expect(result.published).toBe(false);
     expect(result.linkCount).toBeGreaterThan(0);
     expect(result.deadLinks, "every link should resolve").toEqual([]);
   }, 120_000);

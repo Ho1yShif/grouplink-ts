@@ -15,30 +15,24 @@ export interface RebuildConfig {
   /** Notion database holding one row per profile: Name, Slug, Tagline. */
   profilesDatabaseId: string;
   limit: number;
-  /** Skips the commit, the deploy, and the Slack post. */
+  /** Skips the site write to Key Value and the Slack post. */
   dryRun: boolean;
 
-  /** Slug of the profile the root page renders. Its page is written twice. */
+  /** Slug of the profile the root page shows. */
   defaultSlug: string;
 
   /** Seconds a scraped metadata record stays in Key Value. */
   cacheTtlSeconds: number;
 
-  repoOwner: string;
-  repoName: string;
-  branch: string;
-  /** Directory the pages are committed under, without a trailing slash. */
-  siteDir: string;
-
-  staticSiteId: string;
+  /** Public URL of the page, for the Slack message. */
   siteUrl: string;
 }
 
 const FALSY = new Set(["false", "0", "no", "off"]);
 
 /**
- * Case-insensitive, because DRY_RUN guards the commit, the deploy, and the Slack
- * post — reading `False` as true would publish a run the operator meant to hold.
+ * Case-insensitive. DRY_RUN guards the site write and the Slack post, and reading
+ * `False` as true would publish a run the operator meant to hold.
  */
 function envFlag(value: string | undefined, fallback: boolean): boolean {
   const normalized = value?.trim().toLowerCase() ?? "";
@@ -93,26 +87,6 @@ export function loadConfig(
 
     cacheTtlSeconds: envInt("METADATA_TTL_SECONDS", env.METADATA_TTL_SECONDS, 604_800),
 
-    repoOwner: env.GITHUB_REPO_OWNER ?? "",
-    repoName: env.GITHUB_REPO_NAME ?? "",
-    branch: env.GITHUB_BRANCH ?? "main",
-    siteDir: (env.SITE_DIR ?? "site").replace(/\/+$/, ""),
-
-    staticSiteId: env.RENDER_STATIC_SITE_ID ?? "",
     siteUrl: env.SITE_URL ?? "",
   };
-}
-
-/**
- * The write path needs more than the read path does. Called only when the run is
- * about to commit, so a dry run works with just a Notion token and a Key Value URL.
- */
-export function assertWritable(cfg: RebuildConfig): void {
-  const missing: string[] = [];
-  if (!cfg.repoOwner) missing.push("GITHUB_REPO_OWNER");
-  if (!cfg.repoName) missing.push("GITHUB_REPO_NAME");
-  if (!cfg.staticSiteId) missing.push("RENDER_STATIC_SITE_ID");
-  if (missing.length > 0) {
-    throw new Error(`set ${missing.join(", ")}, or run with dryRun: true`);
-  }
 }

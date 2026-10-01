@@ -3,7 +3,6 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { pagePathsFor } from "../src/links.js";
 import { renderPage, type PageModel } from "../src/render.js";
 
 export const repoRoot = fileURLToPath(new URL("..", import.meta.url));
@@ -12,12 +11,11 @@ export const repoRoot = fileURLToPath(new URL("..", import.meta.url));
  * Writes the page to the profile's own path, plus the site root when it is the
  * default profile. Paths are relative to the repo root, as the workflow commits them.
  */
-export function writePages(
-  model: PageModel,
-  options: { siteDir: string; slug: string; defaultSlug: string },
-): void {
+export function writePages(model: PageModel, options: { slug: string; defaultSlug: string }): void {
   const html = renderPage(model);
-  for (const path of pagePathsFor(options.siteDir, options.slug, options.defaultSlug)) {
+  const paths = [`site/${options.slug}/index.html`];
+  if (options.slug === options.defaultSlug) paths.push("site/index.html");
+  for (const path of paths) {
     const out = resolve(repoRoot, path);
     mkdirSync(dirname(out), { recursive: true });
     writeFileSync(out, html);

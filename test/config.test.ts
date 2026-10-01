@@ -1,6 +1,6 @@
 // loadConfig reads only the env it is handed, so each case passes its own.
 import { describe, expect, it } from "vitest";
-import { assertWritable, envInt, loadConfig } from "../src/config.js";
+import { envInt, loadConfig } from "../src/config.js";
 
 const ENV = {
   NOTION_LINKS_DATABASE_ID: "db_links",
@@ -33,10 +33,8 @@ describe("loadConfig", () => {
     expect(loadConfig({ dryRun: false }, { ...ENV, DRY_RUN: "true" }).dryRun).toBe(false);
   });
 
-  it("lowercases the default slug and strips trailing slashes from the site dir", () => {
-    const cfg = load({ SITE_DEFAULT_SLUG: " Shifra ", SITE_DIR: "site///" });
-    expect(cfg.defaultSlug).toBe("shifra");
-    expect(cfg.siteDir).toBe("site");
+  it("lowercases and trims the default slug", () => {
+    expect(load({ SITE_DEFAULT_SLUG: " Shifra " }).defaultSlug).toBe("shifra");
   });
 
   it("names the variable that is missing", () => {
@@ -45,24 +43,6 @@ describe("loadConfig", () => {
       /NOTION_PROFILES_DATABASE_ID/,
     );
     expect(() => loadConfig({}, { ...ENV, SITE_DEFAULT_SLUG: "" })).toThrow(/SITE_DEFAULT_SLUG/);
-  });
-});
-
-describe("assertWritable", () => {
-  const WRITE_ENV = {
-    GITHUB_REPO_OWNER: "acme",
-    GITHUB_REPO_NAME: "links",
-    RENDER_STATIC_SITE_ID: "srv-1",
-  };
-
-  it("passes once the write path is configured", () => {
-    expect(() => assertWritable(load(WRITE_ENV))).not.toThrow();
-  });
-
-  it("names every variable a commit would need", () => {
-    expect(() => assertWritable(load())).toThrow(
-      /GITHUB_REPO_OWNER, GITHUB_REPO_NAME, RENDER_STATIC_SITE_ID/,
-    );
   });
 });
 

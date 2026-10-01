@@ -7,7 +7,6 @@ import {
   faviconUrl,
   fetchableUrls,
   groupByProfile,
-  pagePathsFor,
   servableProfiles,
   skippedRows,
   toCard,
@@ -201,19 +200,6 @@ describe("skippedRows", () => {
       ["FTP", "URL is not an http, https, or mailto: link"],
       ["Script", "URL is not an http, https, or mailto: link"],
     ]);
-  });
-});
-
-describe("pagePathsFor", () => {
-  it("writes the default profile to the root as well as its slug", () => {
-    expect(pagePathsFor("site", "shifra", "shifra")).toEqual([
-      "site/shifra/index.html",
-      "site/index.html",
-    ]);
-  });
-
-  it("writes everyone else to their slug only", () => {
-    expect(pagePathsFor("site", "alex", "shifra")).toEqual(["site/alex/index.html"]);
   });
 });
 
