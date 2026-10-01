@@ -26,7 +26,9 @@
     "@render-lab/tasks-scrape": "0.2.0",
     "@render-lab/tasks-slack": "0.3.0",
     "@render-lab/triggers": "0.2.0",
-    "@renderinc/sdk": "1.0.0"
+    "@renderinc/sdk": "1.0.0",
+    "hono": "4.13.5",
+    "ioredis": "5.11.1"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.13",

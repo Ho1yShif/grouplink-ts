@@ -35,6 +35,12 @@ importers:
       '@renderinc/sdk':
         specifier: 1.0.0
         version: 1.0.0
+      hono:
+        specifier: 4.13.5
+        version: 4.13.5
+      ioredis:
+        specifier: 5.11.1
+        version: 5.11.1
     devDependencies:
       '@biomejs/biome':
         specifier: ^2.5.13

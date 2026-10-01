@@ -1,8 +1,9 @@
-// The receiver app. It owns POST /webhooks/notion and delegates every other route
-// to the @render-lab/triggers dispatch server.
+// The non-page routes of the web service: POST /webhooks/notion, and the routes it
+// delegates to the @render-lab/triggers dispatch server.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createNotionWebhook } from "../src/notion-webhook.js";
-import { buildReceiver, createReceiver } from "../src/webhook.js";
+import { createSiteStore } from "../src/site-store.js";
+import { buildApp, createApp, MAX_BODY_BYTES } from "../src/webhook.js";
 
 function receiver() {
   const calls: Array<[string, unknown[]]> = [];
@@ -10,11 +11,12 @@ function receiver() {
     calls.push([task, args]);
     return { runId: "run-1" };
   };
-  const app = createReceiver({
+  const app = createApp({
     workflowSlug: "grouplink",
     handle: createNotionWebhook({ dispatch, task: "grouplink.rebuild" }),
     // The dispatch server only ever calls start on this.
     dispatcher: { start: dispatch } as never,
+    store: createSiteStore({ read: async () => null, rebuild: async () => {} }),
   });
   return { app, calls };
 }
@@ -27,7 +29,7 @@ function post(app: ReturnType<typeof receiver>["app"], path: string, body: strin
   });
 }
 
-describe("createReceiver", () => {
+describe("createApp", () => {
   it("answers the notion route itself", async () => {
     const { app } = receiver();
     const response = await post(
@@ -73,15 +75,31 @@ describe("createReceiver", () => {
 
     expect(response.status).toBe(404);
   });
+
+  it("answers a HEAD on the health check", async () => {
+    const { app } = receiver();
+    expect((await app.request("/healthz", { method: "HEAD" })).status).toBe(200);
+  });
+
+  it("refuses a notion body over the limit", async () => {
+    const { app } = receiver();
+    const response = await post(app, "/webhooks/notion", "x".repeat(MAX_BODY_BYTES + 1));
+    expect(response.status).toBe(413);
+  });
 });
 
-describe("buildReceiver", () => {
+describe("buildApp", () => {
   beforeEach(() => {
     vi.unstubAllEnvs();
   });
 
-  it("names the variable it needs", () => {
+  it("names the variables it needs", () => {
     vi.stubEnv("WORKFLOW_SLUG", "");
-    expect(() => buildReceiver()).toThrow(/WORKFLOW_SLUG/);
+    vi.stubEnv("REDIS_URL", "");
+    expect(() => buildApp()).toThrow(/WORKFLOW_SLUG/);
+
+    vi.stubEnv("WORKFLOW_SLUG", "grouplink");
+    expect(() => buildApp()).toThrow(/REDIS_URL/);
+    vi.unstubAllEnvs();
   });
 });
