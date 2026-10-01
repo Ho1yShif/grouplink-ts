@@ -62,6 +62,14 @@ describe("buildSnapshot", () => {
     expect(ours.hash).toBe(parseSnapshot(fixture).hash);
   });
 
+  it("escapes U+007F in the hash input the way grouplink-py does", () => {
+    const page: PageModel = { name: "Shifra Williams", tagline: "DEL\u007f here", cards: [] };
+    const doc = parseSnapshot(build(new Map([["shifra", page]]), "shifra"));
+    // grouplink-py wrote this with build_snapshot for the same page, slug, and
+    // built-at time.
+    expect(doc.hash).toBe("fd36acb9b3135c0cd1be75f505fb67db69190346440a275bdff70b25645de856");
+  });
+
   it("leaves the build time out of the hash", () => {
     const later = new Date("2027-01-01T00:00:00Z");
     expect(parseSnapshot(build(undefined, undefined, later)).hash).toBe(

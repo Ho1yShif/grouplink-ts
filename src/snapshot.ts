@@ -64,8 +64,8 @@ export function parseSnapshot(raw: string): Snapshot {
 
 /**
  * The JSON Python's `json.dumps(sort_keys=True, separators=(",", ":"))` writes:
- * sorted keys, and every character above U+007F escaped. The hash is taken over
- * this, so both ports hash the same site to the same value.
+ * sorted keys, and every character from U+007F up escaped. The hash is taken
+ * over this, so both ports hash the same site to the same value.
  */
 function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
@@ -78,7 +78,7 @@ function canonicalJson(value: unknown): string {
 
 function asciiJson(value: unknown): string {
   return JSON.stringify(value).replace(
-    /[\u0080-￿]/g,
+    /[\u007f-￿]/g,
     (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`,
   );
 }
