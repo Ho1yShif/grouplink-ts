@@ -90,6 +90,7 @@ export function createApp({ workflowSlug, dispatcher, handle, store }: AppOption
 
   app.use(
     "/assets/*",
+    etag(),
     serveStatic({ root: ASSETS_DIR, rewriteRequestPath: (path) => path.slice("/assets".length) }),
   );
 
@@ -131,6 +132,12 @@ export function buildApp(): Hono {
     connectTimeout: 2_000,
     commandTimeout: 2_000,
     maxRetriesPerRequest: 1,
+  });
+  // ioredis prints a stack trace for every reconnect attempt if nothing listens
+  // for "error". The store already serves the last good copy on a failed read, so
+  // one short line is enough here.
+  redis.on("error", (error: unknown) => {
+    console.error(`Key Value connection error: ${String(error)}`);
   });
   const task = process.env.REBUILD_TASK ?? "grouplink.rebuild";
   const dispatcher = renderDispatcher({ slug: workflowSlug });
