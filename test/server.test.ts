@@ -174,6 +174,18 @@ describe("page routes", () => {
     expect(missingFont.headers.get("cache-control") ?? "").not.toContain("immutable");
   });
 
+  it("sends an ETag for an asset and answers 304 when it matches", async () => {
+    const { app } = server();
+    const first = await app.request("/assets/render-logomark-black.svg");
+    const etag = first.headers.get("etag") ?? "";
+    expect(etag).not.toBe("");
+
+    const second = await app.request("/assets/render-logomark-black.svg", {
+      headers: { "if-none-match": etag },
+    });
+    expect(second.status).toBe(304);
+  });
+
   it("answers a HEAD request", async () => {
     const response = await server().app.request("/alex", { method: "HEAD" });
     expect(response.status).toBe(200);
