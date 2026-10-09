@@ -227,8 +227,10 @@ The brand woff2 files under `assets/fonts/` are commercial faces. If this
 repo needs to stop redistributing them, delete the three `@font-face` blocks and
 load Manrope and Roboto Mono instead — the fallback chain already names them.
 
-Assets are referenced from the site root (`/assets/…`) so they resolve the same
-from `/` and from `/<slug>/`.
+The pages reference the assets at `/links/assets/…`, because render.com serves
+the site under `/links`. render.com removes `/links` before it sends a request to
+the web service, so the service serves the files at `/assets/…` and at
+`/links/assets/…`.
 
 ### Routes
 
@@ -241,14 +243,15 @@ snapshot. It checks the routes in this order:
 | `GET /healthz`                  | The health check for Render.                                             |
 | `POST /tasks/:task`             | Starts a Workflow run. Needs `Authorization: Bearer $DISPATCH_TOKEN`.    |
 | `POST /webhooks/notion`         | Notion's webhook. A body larger than 1 MiB gets a 413.                   |
-| `GET /assets/*`                 | A file from `assets/`.                                                   |
+| `GET /assets/*`                 | A file from `assets/`. render.com sends asset requests here.             |
+| `GET /links/assets/*`           | The same file. A direct visit to onrender.com asks for this path.        |
 | `GET /`, `/:slug`, `/:slug/`    | The default profile's page, or the page for that slug.                   |
 
 An unknown slug gets a 404 page.
 
 Every response has `X-Content-Type-Options: nosniff` and
-`Referrer-Policy: strict-origin-when-cross-origin`. A font under `/assets/fonts/`
-is cached for one year. A page response has `Cache-Control: no-cache` and an
+`Referrer-Policy: strict-origin-when-cross-origin`. A font under `fonts/` is
+cached for one year. A page response has `Cache-Control: no-cache` and an
 `ETag`, so the browser revalidates on each visit and gets a 304 when the page did
 not change.
 
@@ -261,7 +264,7 @@ copy.
 
 ### Reserved slugs
 
-The slugs `assets`, `healthz`, `tasks`, and `webhooks` are reserved for the
+The slugs `assets`, `healthz`, `links`, `tasks`, and `webhooks` are reserved for the
 routes above. A profile gets no page when its slug is reserved, contains `/`, or
 is the same as the slug of an earlier profile. The run lists each such profile,
 with the reason, in its `skipped` list.

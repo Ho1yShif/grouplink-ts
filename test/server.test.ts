@@ -82,7 +82,7 @@ describe("page routes", () => {
     expect(response.headers.get("content-type")).toContain("text/html");
   });
 
-  it.each(["/tasks", "/webhooks", "/assets"])(
+  it.each(["/tasks", "/webhooks", "/assets", "/links", "/links/assets"])(
     "answers the reserved path %s with a 404",
     async (path) => {
       expect((await server().app.request(path)).status).toBe(404);
@@ -149,27 +149,32 @@ describe("page routes", () => {
     expect((await app.request("/")).headers.get("etag")).not.toBe(etag);
   });
 
-  it.each(["/", "/nobody", "/healthz", "/assets/render-logomark-black.svg"])(
-    "sets the security headers on %s",
-    async (path) => {
-      const response = await server().app.request(path);
-      expect(response.headers.get("x-content-type-options")).toBe("nosniff");
-      expect(response.headers.get("referrer-policy")).toBe("strict-origin-when-cross-origin");
-    },
-  );
+  it.each([
+    "/",
+    "/nobody",
+    "/healthz",
+    "/assets/render-logomark-black.svg",
+    "/links/assets/render-logomark-black.svg",
+  ])("sets the security headers on %s", async (path) => {
+    const response = await server().app.request(path);
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(response.headers.get("referrer-policy")).toBe("strict-origin-when-cross-origin");
+  });
 
-  it("serves the assets with their content types", async () => {
+  // render.com strips /links before it proxies, so it asks for /assets/. A direct
+  // visit to onrender.com asks for /links/assets/.
+  it.each(["/assets", "/links/assets"])("serves the assets under %s", async (prefix) => {
     const { app } = server();
-    const svg = await app.request("/assets/render-logomark-black.svg");
+    const svg = await app.request(`${prefix}/render-logomark-black.svg`);
     expect(svg.status).toBe(200);
     expect(svg.headers.get("content-type")).toMatch(/^image\/svg\+xml/);
 
-    const font = await app.request("/assets/fonts/RoobertVF.woff2");
+    const font = await app.request(`${prefix}/fonts/RoobertVF.woff2`);
     expect(font.status).toBe(200);
     expect(font.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
 
-    expect((await app.request("/assets/nothing.png")).status).toBe(404);
-    const missingFont = await app.request("/assets/fonts/nothing.woff2");
+    expect((await app.request(`${prefix}/nothing.png`)).status).toBe(404);
+    const missingFont = await app.request(`${prefix}/fonts/nothing.woff2`);
     expect(missingFont.status).toBe(404);
     expect(missingFont.headers.get("cache-control") ?? "").not.toContain("immutable");
   });

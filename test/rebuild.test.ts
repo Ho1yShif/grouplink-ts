@@ -464,16 +464,16 @@ describe("grouplink.rebuild", () => {
     expect(scraped).toHaveLength(3);
   });
 
-  it("references assets from the site root so they resolve under /<slug>/", async () => {
+  it("references assets under /links/assets so they resolve behind the render.com proxy", async () => {
     const h = harness();
     await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
 
     const html = h.html("alex");
-    expect(html).toContain('href="/assets/render-logomark-black.svg"');
-    expect(html).toContain("url('/assets/render-logo-white.png')");
-    expect(html).toContain("url('/assets/icons/github.svg')");
-    expect(html).toContain("url('/assets/fonts/RoobertVF.woff2')");
-    expect(html).not.toMatch(/["'(]assets\//);
+    expect(html).toContain('href="/links/assets/render-logomark-black.svg"');
+    expect(html).toContain("url('/links/assets/render-logo-white.png')");
+    expect(html).toContain("url('/links/assets/icons/github.svg')");
+    expect(html).toContain("url('/links/assets/fonts/RoobertVF.woff2')");
+    expect(html).not.toMatch(/["'(]\/?assets\//);
   });
 
   it("carries the scraped description onto the card", async () => {

@@ -62,7 +62,7 @@ export function createApp({ workflowSlug, dispatcher, handle, store }: AppOption
     await next();
     c.res.headers.set("X-Content-Type-Options", "nosniff");
     c.res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-    if (c.res.status === 200 && c.req.path.startsWith("/assets/fonts/")) {
+    if (c.res.status === 200 && /^(\/links)?\/assets\/fonts\//.test(c.req.path)) {
       c.res.headers.set("Cache-Control", "public, max-age=31536000, immutable");
     }
   });
@@ -88,11 +88,15 @@ export function createApp({ workflowSlug, dispatcher, handle, store }: AppOption
     },
   );
 
-  app.use(
-    "/assets/*",
-    etag(),
-    serveStatic({ root: ASSETS_DIR, rewriteRequestPath: (path) => path.slice("/assets".length) }),
-  );
+  // The pages ask for /links/assets/. render.com strips /links before it proxies
+  // here, and a direct visit to onrender.com does not, so serve both paths.
+  for (const prefix of ["/assets", "/links/assets"]) {
+    app.use(
+      `${prefix}/*`,
+      etag(),
+      serveStatic({ root: ASSETS_DIR, rewriteRequestPath: (path) => path.slice(prefix.length) }),
+    );
+  }
 
   async function page(c: Context): Promise<Response> {
     const snapshot = await store.snapshot();

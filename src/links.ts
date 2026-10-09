@@ -174,7 +174,7 @@ export function toProfileRows(pages: PageDTO[]): ProfileRow[] {
 }
 
 /** Paths the web service answers itself, so no profile can use one as its slug. */
-export const RESERVED_SLUGS = new Set(["assets", "healthz", "tasks", "webhooks"]);
+export const RESERVED_SLUGS = new Set(["assets", "healthz", "links", "tasks", "webhooks"]);
 
 /** Why the web service cannot serve this slug, or "" when it can. */
 function slugProblem(slug: string): string {

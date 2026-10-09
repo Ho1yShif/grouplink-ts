@@ -132,7 +132,7 @@ describe("renderPage", () => {
     const html = renderPage(model);
     for (const name of ICON_NAMES) {
       expect(html).toContain(
-        `.card__mark--${name} { --mark: url('/assets/link-icons/${name}.png'); }`,
+        `.card__mark--${name} { --mark: url('/links/assets/link-icons/${name}.png'); }`,
       );
     }
   });

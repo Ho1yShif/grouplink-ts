@@ -22,25 +22,25 @@ const ROW_STAGGER = Array.from(
  * policy allows that block by hash and no style attribute at all.
  */
 const ICON_MASKS = ICON_NAMES.map(
-  (name) => `.card__mark--${name} { --mark: url('/assets/link-icons/${name}.png'); }`,
+  (name) => `.card__mark--${name} { --mark: url('/links/assets/link-icons/${name}.png'); }`,
 ).join("\n");
 
 export const STYLES = `
 @font-face {
   font-family: 'Roobert';
-  src: url('/assets/fonts/RoobertVF.woff2') format('woff2-variations');
+  src: url('/links/assets/fonts/RoobertVF.woff2') format('woff2-variations');
   font-weight: 300 500;
   font-display: swap;
 }
 @font-face {
   font-family: 'PP Neue Montreal';
-  src: url('/assets/fonts/PPNeueMontreal-Variable.woff2') format('woff2-variations');
+  src: url('/links/assets/fonts/PPNeueMontreal-Variable.woff2') format('woff2-variations');
   font-weight: 300 500;
   font-display: swap;
 }
 @font-face {
   font-family: 'PP Neue Montreal Mono';
-  src: url('/assets/fonts/PPNeueMontrealMono-Medium.woff2') format('woff2');
+  src: url('/links/assets/fonts/PPNeueMontrealMono-Medium.woff2') format('woff2');
   font-weight: 500;
   font-display: swap;
 }
@@ -138,8 +138,8 @@ body {
   width: 240px;
   height: 46px;
   background-color: currentColor;
-  -webkit-mask: url('/assets/render-logo-white.png') center / contain no-repeat;
-  mask: url('/assets/render-logo-white.png') center / contain no-repeat;
+  -webkit-mask: url('/links/assets/render-logo-white.png') center / contain no-repeat;
+  mask: url('/links/assets/render-logo-white.png') center / contain no-repeat;
 }
 
 .links { border-top: 1px solid var(--border); }
@@ -281,11 +281,11 @@ ${ICON_MASKS}
   transform: translateY(var(--nudge, 0));
 }
 
-.social__icon--youtube { --icon: url('/assets/icons/youtube.svg'); --nudge: 3.5px; }
-.social__icon--linkedin { --icon: url('/assets/icons/linkedin.svg'); }
-.social__icon--x { --icon: url('/assets/icons/x.svg'); }
-.social__icon--github { --icon: url('/assets/icons/github.svg'); --nudge: 0.3px; }
-.social__icon--discord { --icon: url('/assets/icons/discord.svg'); --nudge: 2.9px; }
+.social__icon--youtube { --icon: url('/links/assets/icons/youtube.svg'); --nudge: 3.5px; }
+.social__icon--linkedin { --icon: url('/links/assets/icons/linkedin.svg'); }
+.social__icon--x { --icon: url('/links/assets/icons/x.svg'); }
+.social__icon--github { --icon: url('/links/assets/icons/github.svg'); --nudge: 0.3px; }
+.social__icon--discord { --icon: url('/links/assets/icons/discord.svg'); --nudge: 2.9px; }
 
 @media (max-width: 767px) {
   .page { padding: 48px 16px 40px; gap: 32px; }

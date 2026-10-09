@@ -176,8 +176,8 @@ ${SOCIALS.map(renderSocial).join("\n")}
 <meta property="og:title" content="${escapeHtml(model.name)} — links">
 <meta property="og:description" content="${escapeHtml(taglineText)}">
 <meta property="og:type" content="website">
-<link rel="icon" href="/assets/render-logomark-black.svg" media="(prefers-color-scheme: light)">
-<link rel="icon" href="/assets/render-logomark-white.svg" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/links/assets/render-logomark-black.svg" media="(prefers-color-scheme: light)">
+<link rel="icon" href="/links/assets/render-logomark-white.svg" media="(prefers-color-scheme: dark)">
 <style>${STYLES}</style>
 </head>
 <body>
