@@ -1,5 +1,5 @@
 // grouplink.rebuild — read the profiles and their links from Notion, enrich them,
-// write the site to Key Value for the web service to serve, and say so in Slack.
+// write the site to Key Value for the web service to serve, and log the outcome.
 //
 // Every `await ctx.run(...)` below is a separate durable run on its own instance,
 // with that package's retry policy, tracked in the dashboard. The per-URL stages fan
@@ -10,7 +10,6 @@ import type { PageDTO } from "@render-lab/tasks-notion";
 import { extractPageMetadata } from "@render-lab/tasks-scrape";
 import { get as kvGet, set as kvSet } from "@render-lab/tasks-render-kv";
 import { request } from "@render-lab/tasks-http";
-import { postMessage } from "@render-lab/tasks-slack";
 
 import { mapInBatches } from "./batch.js";
 import { loadConfig, type RebuildConfig, type RebuildInput } from "./config.js";
@@ -61,14 +60,7 @@ export interface RebuildResult {
 export const rebuild = task(
   { name: "grouplink.rebuild" },
   async function rebuild(ctx: TaskContext, input: RebuildInput = {}): Promise<RebuildResult> {
-    try {
-      return await runRebuild(ctx, input);
-    } catch (error) {
-      // The webhook receiver only dispatches the run, so a failure would otherwise
-      // show up nowhere but the dashboard.
-      await reportFailure(ctx, error);
-      throw error;
-    }
+    return runRebuild(ctx, input);
   },
 );
 
@@ -123,9 +115,8 @@ async function runRebuild(ctx: TaskContext, input: RebuildInput): Promise<Rebuil
   //    so Key Value never evicts it. The page is live when the SET returns.
   const current = await ctx.run(kvGet, { key: SITE_KEY });
   if (snapshotHash(current.value) === hash) {
-    // A quiet day is not worth a Slack message. A broken link is.
     if (deadLinks.length > 0) {
-      await notify(ctx, "grouplink is unchanged, but some links are unreachable.", deadLinks);
+      logOutcome("grouplink is unchanged, but some links are unreachable.", deadLinks);
     }
     return result;
   }
@@ -133,9 +124,7 @@ async function runRebuild(ctx: TaskContext, input: RebuildInput): Promise<Rebuil
   await ctx.run(kvSet, { key: SITE_KEY, value: snapshot });
   result.published = true;
 
-  // 6) Chained run: post the outcome.
-  await notify(
-    ctx,
+  logOutcome(
     `grouplink is live with ${cardUrls.length} links across ${pages.length} pages. ${cfg.siteUrl}`,
     deadLinks,
   );
@@ -217,16 +206,6 @@ function snapshotHash(value: string | null | undefined): string | null {
   }
 }
 
-/** Never masks the error it is reporting: a failed Slack post is logged and dropped. */
-async function reportFailure(ctx: TaskContext, error: unknown): Promise<void> {
-  const text = error instanceof Error ? error.message : String(error);
-  try {
-    await notify(ctx, `grouplink.rebuild failed: ${text}`, []);
-  } catch (postError) {
-    console.error("could not post the failure to Slack", postError);
-  }
-}
-
 function unreachable(check: { ok: boolean; status: number } | undefined): boolean {
   if (!check) return true;
   return !check.ok && !REFUSED_STATUSES.has(check.status);
@@ -245,7 +224,6 @@ function readCached(value: string | null | undefined): CachedMeta | null {
   return null;
 }
 
-async function notify(ctx: TaskContext, text: string, deadLinks: string[]): Promise<void> {
-  const body = deadLinks.length > 0 ? `${text}\nUnreachable: ${deadLinks.join(", ")}` : text;
-  await ctx.run(postMessage, { text: body });
+function logOutcome(text: string, deadLinks: string[]): void {
+  console.log(deadLinks.length > 0 ? `${text}\nUnreachable: ${deadLinks.join(", ")}` : text);
 }

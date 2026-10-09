@@ -1,7 +1,7 @@
 // Build the snapshot from the real Notion databases and write it to a local Redis,
 // so a local web service serves the same pages as production. Run with
 // `pnpm preview`. This is the read half of grouplink.rebuild: Notion and the
-// scrape, with no metadata cache, no health check, and no Slack post.
+// scrape, with no metadata cache and no health check.
 import { localCtx } from "@render-lab/test-utils";
 import { extractPageMetadata } from "@render-lab/tasks-scrape";
 import { mapInBatches } from "../src/batch.js";

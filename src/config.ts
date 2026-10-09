@@ -15,7 +15,7 @@ export interface RebuildConfig {
   /** Notion database holding one row per profile: Name, Slug, Tagline. */
   profilesDatabaseId: string;
   limit: number;
-  /** Skips the site write to Key Value and the Slack post. */
+  /** Skips the site write to Key Value. */
   dryRun: boolean;
 
   /** Slug of the profile the root page shows. */
@@ -24,14 +24,14 @@ export interface RebuildConfig {
   /** Seconds a scraped metadata record stays in Key Value. */
   cacheTtlSeconds: number;
 
-  /** Public URL of the page, for the Slack message. */
+  /** Public URL of the page, for the logged outcome. */
   siteUrl: string;
 }
 
 const FALSY = new Set(["false", "0", "no", "off"]);
 
 /**
- * Case-insensitive. DRY_RUN guards the site write and the Slack post, and reading
+ * Case-insensitive. DRY_RUN guards the site write, and reading
  * `False` as true would publish a run the operator meant to hold.
  */
 function envFlag(value: string | undefined, fallback: boolean): boolean {

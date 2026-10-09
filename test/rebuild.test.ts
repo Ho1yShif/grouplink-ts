@@ -3,14 +3,13 @@
 // port. No network, no secrets — but the pack code, the DTO mapping, and the
 // composition in src/rebuild.ts are all real.
 import { fromPartial } from "@total-typescript/shoehorn";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TaskContext } from "@renderinc/sdk/workflows";
 
 import { queryDatabaseImpl } from "@render-lab/tasks-notion";
 import { extractPageMetadataImpl } from "@render-lab/tasks-scrape";
 import { getImpl as kvGetImpl, setImpl as kvSetImpl } from "@render-lab/tasks-render-kv";
 import { requestImpl } from "@render-lab/tasks-http";
-import { postMessageImpl } from "@render-lab/tasks-slack";
 
 import { LINK_SORTS } from "../src/links.js";
 import { rebuild } from "../src/rebuild.js";
@@ -148,7 +147,6 @@ function harness(fakes: Fakes = {}) {
     };
   });
   const kvSet = vi.fn(async (_k: string, _v: string, _ttl?: number) => {});
-  const slackPost = vi.fn(async () => true);
 
   const kv = {
     get: async (key: string) =>
@@ -198,8 +196,6 @@ function harness(fakes: Fakes = {}) {
         }),
       );
     },
-    "slack.postMessage": (input: Input<typeof postMessageImpl>) =>
-      postMessageImpl(ctx, input, fromPartial({ slack: { post: slackPost } })),
   };
 
   const ctx: TaskContext = fromPartial({
@@ -240,14 +236,24 @@ function harness(fakes: Fakes = {}) {
     tasks,
     peak: () => peakInFlight,
     kvSet,
-    slackPost,
     siteSets,
     snapshot,
     html,
   };
 }
 
+/** Spies on console.log and returns the outcome lines the run logs. */
+function captureOutcomes(): () => string[] {
+  const log = vi.spyOn(console, "log").mockImplementation(() => {});
+  return () =>
+    log.mock.calls.map(([line]) => String(line)).filter((line) => line.startsWith("grouplink "));
+}
+
 describe("grouplink.rebuild", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("renders every visible link in Notion order, and no hidden one", async () => {
     const h = harness();
     const result = await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
@@ -510,15 +516,14 @@ describe("grouplink.rebuild", () => {
     expect(result.deadLinks).toEqual(["https://render.com/startups (404)"]);
   });
 
-  it("publishes and posts that the site is live", async () => {
+  it("publishes and logs that the site is live", async () => {
     const h = harness();
+    const outcomes = captureOutcomes();
     const result = await withEnv({ DRY_RUN: "false" }, () => rebuild.func(h.ctx, {}));
 
     expect(result.published).toBe(true);
-    expect(h.slackPost).toHaveBeenCalledTimes(1);
-    expect(JSON.stringify(h.slackPost.mock.calls[0])).toContain(
-      "grouplink is live with 3 links across 2 pages.",
-    );
+    expect(outcomes()).toHaveLength(1);
+    expect(outcomes()[0]).toContain("grouplink is live with 3 links across 2 pages.");
   });
 
   it("never calls GitHub or the Render API", async () => {
@@ -553,23 +558,25 @@ describe("grouplink.rebuild", () => {
     await withEnv({ DRY_RUN: "false" }, () => rebuild.func(first.ctx, {}));
 
     const second = harness({ site: first.siteSets()[0]?.[1] });
+    const outcomes = captureOutcomes();
     const result = await withEnv({ DRY_RUN: "false" }, () => rebuild.func(second.ctx, {}));
 
     expect(second.siteSets()).toEqual([]);
     expect(result.published).toBe(false);
-    expect(second.slackPost).not.toHaveBeenCalled();
+    expect(outcomes()).toEqual([]);
   });
 
-  it("posts dead links even when the site is unchanged", async () => {
+  it("logs dead links even when the site is unchanged", async () => {
     const statuses = { "https://render.com/startups": 404 };
     const first = harness({ statuses });
     await withEnv({ DRY_RUN: "false" }, () => rebuild.func(first.ctx, {}));
 
     const second = harness({ site: first.siteSets()[0]?.[1], statuses });
+    const outcomes = captureOutcomes();
     await withEnv({ DRY_RUN: "false" }, () => rebuild.func(second.ctx, {}));
 
-    const text = JSON.stringify(second.slackPost.mock.calls[0]);
-    expect(second.slackPost).toHaveBeenCalledTimes(1);
+    const [text] = outcomes();
+    expect(outcomes()).toHaveLength(1);
     expect(text).toContain("unchanged");
     expect(text).toContain("https://render.com/startups (404)");
   });
@@ -617,24 +624,15 @@ describe("grouplink.rebuild", () => {
     expect(result.deadLinks).toEqual([]);
   });
 
-  it("posts the failure to Slack before it rethrows", async () => {
-    const h = harness();
-    await expect(
-      withEnv({ DRY_RUN: "false", SITE_DEFAULT_SLUG: "nobody" }, () => rebuild.func(h.ctx, {})),
-    ).rejects.toThrow(/matches no Slug/);
-
-    expect(h.slackPost).toHaveBeenCalledTimes(1);
-    expect(JSON.stringify(h.slackPost.mock.calls[0])).toContain("grouplink.rebuild failed");
-  });
-
   it("writes nothing on a dry run", async () => {
     const h = harness();
+    const outcomes = captureOutcomes();
     const result = await withEnv({ DRY_RUN: "true" }, () => rebuild.func(h.ctx, {}));
 
     expect(result.dryRun).toBe(true);
     expect(result.linkCount).toBe(3);
     expect(result.published).toBe(false);
     expect(h.siteSets()).toEqual([]);
-    expect(h.slackPost).not.toHaveBeenCalled();
+    expect(outcomes()).toEqual([]);
   });
 });

@@ -26,9 +26,6 @@ importers:
       '@render-lab/tasks-scrape':
         specifier: 0.2.0
         version: 0.2.0(@renderinc/sdk@1.0.0)
-      '@render-lab/tasks-slack':
-        specifier: 0.3.0
-        version: 0.3.0(@render-lab/triggers@0.2.0)(@renderinc/sdk@1.0.0)
       '@render-lab/triggers':
         specifier: 0.2.0
         version: 0.2.0
@@ -358,15 +355,6 @@ packages:
     resolution: {integrity: sha512-8be+rjuMwxfGnPBjwv12r8x6IKmzqB6J4dhBSXk9sTKI6+LGVBb04hFS0+nyqLDVnlT0EKObDRTKG2FT611fAw==}
     peerDependencies:
       '@renderinc/sdk': 1.0.0
-
-  '@render-lab/tasks-slack@0.3.0':
-    resolution: {integrity: sha512-iIY8rhvGZTJ46vve7kVZEvJmAkvGhVV/0R6vW7eQa+IVa6JuqO/6D9scoB38o20ajUu8ZdA+wqDbTJMF4ftBcQ==}
-    peerDependencies:
-      '@render-lab/triggers': 0.2.0
-      '@renderinc/sdk': 1.0.0
-    peerDependenciesMeta:
-      '@render-lab/triggers':
-        optional: true
 
   '@render-lab/test-utils@0.1.0':
     resolution: {integrity: sha512-Saeiszse0VimjI8jltwokyOjZVQ1ahlsZhWAjk1OrtdtEWWRmzQiSTMYi7mVMPiZE8g6VtOenESOywrO6jBlVg==}
@@ -1157,13 +1145,6 @@ snapshots:
     dependencies:
       '@render-lab/tasks-core': 0.2.0(@renderinc/sdk@1.0.0)
       '@renderinc/sdk': 1.0.0
-
-  '@render-lab/tasks-slack@0.3.0(@render-lab/triggers@0.2.0)(@renderinc/sdk@1.0.0)':
-    dependencies:
-      '@render-lab/tasks-core': 0.2.0(@renderinc/sdk@1.0.0)
-      '@renderinc/sdk': 1.0.0
-    optionalDependencies:
-      '@render-lab/triggers': 0.2.0
 
   '@render-lab/test-utils@0.1.0(@renderinc/sdk@1.0.0)':
     dependencies:
