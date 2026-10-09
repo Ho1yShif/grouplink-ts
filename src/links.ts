@@ -27,7 +27,7 @@ export interface LinkRow {
   everyone: boolean;
   /** Notion page ids of the Profiles rows this link belongs to. */
   profileIds: string[];
-  /** Which file under link/assets/link-icons the card draws. */
+  /** Which file under assets/link-icons the card draws. */
   icon: IconName;
   /** The `Order` cell. null when the cell is empty or holds no number. */
   order: number | null;
