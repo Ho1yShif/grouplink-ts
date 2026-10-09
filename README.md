@@ -151,7 +151,7 @@ fails. The site keeps serving the last snapshot.
 
 ### Icons
 
-Each card draws an icon from `assets/link-icons/`. The `Icon` select option
+Each card draws an icon from `link/assets/link-icons/`. The `Icon` select option
 is the filename without `.png`, so the options are `arrow`, `credits`,
 `download`, `email`, `form`, `info`, `render`, `upload`, and `workflows`. An
 empty cell renders `arrow`. An option no file matches also renders `arrow`, and
@@ -221,16 +221,16 @@ The masthead is centered, with the Render wordmark above a row of social icons.
 It is the same on every page. The icons are YouTube, LinkedIn, X, GitHub, and
 Discord, and they come from `SOCIALS` in `src/render.ts` rather than from Notion,
 so editing that list is the only way to change the row. Each label needs a
-matching file in `assets/icons/`. The wordmark and the icons are white files
+matching file in `link/assets/icons/`. The wordmark and the icons are white files
 drawn as CSS masks and painted with the text color, so they read on both the
 light and dark background.
 
-The brand woff2 files under `assets/fonts/` are commercial faces. If this
+The brand woff2 files under `link/assets/fonts/` are commercial faces. If this
 repo needs to stop redistributing them, delete the three `@font-face` blocks and
 load Manrope and Roboto Mono instead — the fallback chain already names them.
 
 Assets are referenced from the site root (`/assets/…`) so they resolve the same
-from `/` and from `/<slug>/`.
+from `/` and from `/<slug>/`. The web service serves them from `link/assets/`.
 
 ### Routes
 
@@ -243,7 +243,7 @@ snapshot. It checks the routes in this order:
 | `GET /healthz`                  | The health check for Render.                                             |
 | `POST /tasks/:task`             | Starts a Workflow run. Needs `Authorization: Bearer $DISPATCH_TOKEN`.    |
 | `POST /webhooks/notion`         | Notion's webhook. A body larger than 1 MiB gets a 413.                   |
-| `GET /assets/*`                 | A file from `assets/`.                                                   |
+| `GET /assets/*`                 | A file from `link/assets/`.                                              |
 | `GET /`, `/:slug`, `/:slug/`    | The default profile's page, or the page for that slug.                   |
 
 An unknown slug gets a 404 page.

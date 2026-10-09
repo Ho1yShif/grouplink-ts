@@ -28,7 +28,7 @@ import { createSiteStore, type SiteStore } from "./site-store.js";
 import { SITE_KEY } from "./snapshot.js";
 
 /** The same path from src/ under tsx and from dist/ under node. */
-const ASSETS_DIR = fileURLToPath(new URL("../assets", import.meta.url));
+const ASSETS_DIR = fileURLToPath(new URL("../link/assets", import.meta.url));
 
 const NOT_FOUND_HTML =
   '<!doctype html><html lang="en"><head><meta charset="utf-8">' +

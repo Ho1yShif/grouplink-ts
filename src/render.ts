@@ -21,7 +21,7 @@ export interface LinkCard {
   description: string;
   /** `<origin>/favicon.ico`, hidden on error. */
   iconUrl: string;
-  /** Which file under assets/link-icons the card draws in its left column. */
+  /** Which file under link/assets/link-icons the card draws in its left column. */
   icon: IconName;
 }
 
@@ -136,7 +136,7 @@ const LOGO_HREF = "https://dashboard.render.com/";
 
 /**
  * The masthead's icon row. It is the same on every page and does not come from
- * Notion. Each label needs a matching file under assets/icons and a
+ * Notion. Each label needs a matching file under link/assets/icons and a
  * .social__icon--<label> rule in styles.ts.
  */
 const SOCIALS: SocialLink[] = [
