@@ -30,7 +30,7 @@
     "ioredis": "5.11.1"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.13",
+    "@biomejs/biome": "^2.5.15",
     "@render-lab/test-utils": "0.1.0",
     "@total-typescript/shoehorn": "^0.1.2",
     "@types/node": "^26.1.1",
