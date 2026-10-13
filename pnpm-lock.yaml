@@ -4,9 +4,6 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-patchedDependencies:
-  '@render-lab/tasks-notion@0.5.0': 3349a62bddc34cb575370deeec2a16823ecba0ca6ff78cea11096f59a7ef0734
-
 importers:
 
   .:
@@ -18,8 +15,8 @@ importers:
         specifier: 0.2.0
         version: 0.2.0(@renderinc/sdk@1.0.0)
       '@render-lab/tasks-notion':
-        specifier: 0.5.0
-        version: 0.5.0(patch_hash=3349a62bddc34cb575370deeec2a16823ecba0ca6ff78cea11096f59a7ef0734)(@renderinc/sdk@1.0.0)
+        specifier: 0.6.1
+        version: 0.6.1(@renderinc/sdk@1.0.0)
       '@render-lab/tasks-render-kv':
         specifier: 0.3.0
         version: 0.3.0(@renderinc/sdk@1.0.0)
@@ -341,8 +338,8 @@ packages:
     peerDependencies:
       '@renderinc/sdk': 1.0.0
 
-  '@render-lab/tasks-notion@0.5.0':
-    resolution: {integrity: sha512-z6b4xARTt7Sj3ANCabxyLtwHCRjo8czrNTEQdwhuRQh40gFL/u4J/2jArs21At2zMqnp668vanHVLqGz1Buf2A==}
+  '@render-lab/tasks-notion@0.6.1':
+    resolution: {integrity: sha512-1mGPybPEf0eMe+HfL1J7n5mBToPumGmZQVcp7bRTFKH996M4gqIM+vv/W5aYhsQzkcZ+1aluL9ghDRDwXc92Gg==}
     peerDependencies:
       '@renderinc/sdk': 1.0.0
 
@@ -1129,7 +1126,7 @@ snapshots:
     dependencies:
       '@renderinc/sdk': 1.0.0
 
-  '@render-lab/tasks-notion@0.5.0(patch_hash=3349a62bddc34cb575370deeec2a16823ecba0ca6ff78cea11096f59a7ef0734)(@renderinc/sdk@1.0.0)':
+  '@render-lab/tasks-notion@0.6.1(@renderinc/sdk@1.0.0)':
     dependencies:
       '@notionhq/client': 5.26.0
       '@renderinc/sdk': 1.0.0

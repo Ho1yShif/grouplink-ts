@@ -7,5 +7,3 @@ onlyBuiltDependencies:
   - esbuild
 allowBuilds:
   esbuild: true
-patchedDependencies:
-  '@render-lab/tasks-notion@0.5.0': patches/@render-lab__tasks-notion@0.5.0.patch
