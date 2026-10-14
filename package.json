@@ -27,7 +27,7 @@
     "@render-lab/triggers": "0.2.0",
     "@renderinc/sdk": "1.0.0",
     "hono": "4.13.5",
-    "ioredis": "5.11.1"
+    "ioredis": "6.0.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.13",
