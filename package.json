@@ -19,7 +19,7 @@
     "preview": "tsx --env-file=.env scripts/preview.ts"
   },
   "dependencies": {
-    "@hono/node-server": "^2.1.1",
+    "@hono/node-server": "^2.1.4",
     "@render-lab/tasks-http": "0.2.0",
     "@render-lab/tasks-notion": "0.6.1",
     "@render-lab/tasks-render-kv": "0.3.0",
